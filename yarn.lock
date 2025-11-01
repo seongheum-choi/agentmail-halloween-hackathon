@@ -1375,6 +1375,13 @@ agentkeepalive@^4.2.1:
   dependencies:
     humanize-ms "^1.2.1"
 
+agentmail@^0.1.4:
+  version "0.1.4"
+  resolved "https://registry.yarnpkg.com/agentmail/-/agentmail-0.1.4.tgz#1ee3b77db5223fa6f42e2370538bbf1f8416dc0b"
+  integrity sha512-PBDB0ClX7o0olYJ8xyDKmwTKTNaXrs8Ecn8qbguK9k5TPPbcHQrXsW3Y1gZkAXQBOzRDEAIVHFitWVQFJaxMtw==
+  dependencies:
+    ws "^8.16.0"
+
 ajv-formats@2.1.1, ajv-formats@^2.1.1:
   version "2.1.1"
   resolved "https://registry.yarnpkg.com/ajv-formats/-/ajv-formats-2.1.1.tgz#6e669400659eb74973bbf2e33327180a0996b520"
@@ -5105,6 +5112,11 @@ write-file-atomic@^4.0.2:
   dependencies:
     imurmurhash "^0.1.4"
     signal-exit "^3.0.7"
+
+ws@^8.16.0:
+  version "8.18.3"
+  resolved "https://registry.yarnpkg.com/ws/-/ws-8.18.3.tgz#b56b88abffde62791c639170400c93dcb0c95472"
+  integrity sha512-PEIGCY5tSlUt50cqyMXfCzX+oOPqN0vuGqWzbcJ2xvnkzkq46oOpz7dQaTDBdfICb4N14+GARUDw2XV2N4tvzg==
 
 xtend@^4.0.2:
   version "4.0.2"
