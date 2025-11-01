@@ -13,9 +13,7 @@ export class AgentService {
   ) {}
 
   async chat(chatRequest: ChatRequestDto) {
-    this.logger.log(
-      `Processing chat request: ${chatRequest.message.substring(0, 50)}...`,
-    );
+    this.logger.log(`Processing chat request: ${chatRequest.message.substring(0, 50)}...`);
 
     try {
       let relevantContext = '';
