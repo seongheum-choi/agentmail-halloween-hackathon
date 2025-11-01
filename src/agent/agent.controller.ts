@@ -1,6 +1,7 @@
 import { Controller, Post, Body, Get, Query } from '@nestjs/common';
 import { AgentService } from './agent.service';
 import { ChatRequestDto } from './dto/chat-request.dto';
+import { CalendarQueryDto } from './dto/calendar-query.dto';
 import { HyperspellService } from './services/hyperspell.service';
 
 @Controller('agent')
@@ -28,5 +29,11 @@ export class AgentController {
       connectUrl,
       token,
     };
+  }
+
+  @Post('calendar/query')
+  async queryCalendar(@Body() calendarQuery: CalendarQueryDto) {
+    const { query, userId, answer = true } = calendarQuery;
+    return this.hyperspellService.queryCalendar(query, userId, answer);
   }
 }

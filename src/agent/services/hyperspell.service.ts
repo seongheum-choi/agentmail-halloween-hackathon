@@ -1,9 +1,10 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Hyperspell from 'hyperspell';
 
 @Injectable()
 export class HyperspellService {
+  private readonly logger = new Logger(HyperspellService.name);
   private hyperspell: Hyperspell;
 
   constructor(private configService: ConfigService) {
@@ -11,7 +12,7 @@ export class HyperspellService {
 
     if (!apiKey || apiKey === 'hs-0-xxxxxxxxxxxxxxxxxxxxxx') {
       throw new Error(
-        'HYPERSPELL_API_KEY is not configured. Please set a valid API key in your .env file.'
+        'HYPERSPELL_API_KEY is not configured. Please set a valid API key in your .env file.',
       );
     }
 
@@ -24,7 +25,7 @@ export class HyperspellService {
       return response.token;
     } catch (error) {
       throw new BadRequestException(
-        `Failed to get Hyperspell user token: ${error.message}. Please verify your HYPERSPELL_API_KEY is valid.`
+        `Failed to get Hyperspell user token: ${error.message}. Please verify your HYPERSPELL_API_KEY is valid.`,
       );
     }
   }
@@ -52,9 +53,35 @@ export class HyperspellService {
 
       return response.answer;
     } catch (error) {
-      throw new BadRequestException(
-        `Failed to search Hyperspell memories: ${error.message}`
-      );
+      throw new BadRequestException(`Failed to search Hyperspell memories: ${error.message}`);
+    }
+  }
+
+  async queryCalendar(query: string, userId: string = 'anonymous', answer: boolean = true) {
+    try {
+      const hyperspell = new Hyperspell({
+        apiKey: this.configService.get<string>('HYPERSPELL_API_KEY'),
+        userID: userId,
+      });
+
+      const response = await hyperspell.memories.search({
+        query,
+        answer,
+        sources: ['google_calendar'],
+      });
+
+      if (response.errors.length > 0) {
+        const errorMessages = response.errors.map((err) => err['message']).join(', ');
+        throw new BadRequestException(`Failed to query Google Calendar: ${errorMessages}`);
+      }
+      this.logger.debug(response);
+
+      return {
+        answer: response.answer,
+        documents: response.documents || [],
+      };
+    } catch (error) {
+      throw new BadRequestException(`Failed to query Google Calendar: ${error.message}`);
     }
   }
 }
