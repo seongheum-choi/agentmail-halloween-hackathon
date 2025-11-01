@@ -11,7 +11,7 @@ export class WebhookController {
   @Post()
   @HttpCode(200)
   async handleWebhook(@Body() payload: WebhookPayloadDto) {
-    this.logger.log('Webhook received');
+    this.logger.log('AgentMail Webhook received');
 
     this.webhookService.handleWebhook(payload).catch((error) => {
       this.logger.error(`Error processing webhook: ${error.message}`, error.stack);
@@ -21,13 +21,13 @@ export class WebhookController {
     return { success: true };
   }
 
-  @Post('agentmail')
+  @Post('test')
   @HttpCode(200)
   async handleAgentMailWebhook(@Body() payload: WebhookPayloadDto) {
-    this.logger.log('AgentMail webhook received');
+    this.logger.log('[TEST] AgentMail Webhook received');
 
-    this.webhookService.handleWebhookWithAI(payload).catch((error) => {
-      this.logger.error(`Error processing AgentMail webhook: ${error.message}`, error.stack);
+    this.webhookService.handleTestWebhook(payload).catch((error) => {
+      this.logger.error(`Error processing [TEST] AgentMail webhook: ${error.message}`, error.stack);
     });
 
     return { success: true };

@@ -14,7 +14,7 @@ export class EmailResponseGeneratorService {
 
   constructor(private readonly chatGPTService: ChatGPTService) {}
 
-  async generateEmail(request: EmailGenerationRequest): Promise<string> {
+  async generateEmail(request: EmailGenerationRequest, threadContext: any = null): Promise<string> {
     this.logger.log(`Generating email for action: ${request.action}`);
 
     switch (request.action) {
@@ -24,6 +24,7 @@ export class EmailResponseGeneratorService {
           request.recipientName,
           request.senderName,
           request.meetingPurpose,
+          threadContext,
         );
       case EmailAction.CONFIRM:
         return this.generateConfirmEmail(
@@ -31,6 +32,7 @@ export class EmailResponseGeneratorService {
           request.recipientName,
           request.senderName,
           request.meetingPurpose,
+          threadContext,
         );
       case EmailAction.COUNTEROFFER:
         return this.generateCounterOfferEmail(
@@ -38,6 +40,7 @@ export class EmailResponseGeneratorService {
           request.recipientName,
           request.senderName,
           request.meetingPurpose,
+          threadContext,
         );
       default:
         throw new Error(`Unsupported action: ${request.action}`);
@@ -49,6 +52,7 @@ export class EmailResponseGeneratorService {
     recipientName?: string,
     senderName?: string,
     meetingPurpose?: string,
+    threadContext: any = null,
   ): Promise<string> {
     const timeSlots = context.availableTimeSlots
       .map((slot, index) => {
@@ -69,10 +73,11 @@ Rules:
 - Ask the recipient to choose or suggest alternatives
 - Include appropriate closing and signature if sender name is provided
 - Keep the tone warm but professional
-- DO NOT use any special formatting like bold (**text**) or markdown`,
+- DO NOT use any special formatting like bold (**text**) or markdown
+- If thread history is provided, reference the conversation context naturally`,
     };
 
-    const userMessage = `Generate an email with the following information:
+    let userMessage = `Generate an email with the following information:
 
 Action: Offer meeting time slots
 ${recipientName ? `Recipient Name: ${recipientName}` : 'Recipient: (no specific name)'}
@@ -83,6 +88,19 @@ Available Time Slots:
 ${timeSlots}
 
 Generate a complete email body that offers these time slots professionally.`;
+
+    if (threadContext && threadContext.messages && threadContext.messages.length > 0) {
+      const threadHistory = threadContext.messages
+        .map((msg: any, idx: number) => {
+          const from = msg.from || 'Unknown';
+          const timestamp = msg.timestamp || msg.createdAt || 'Unknown time';
+          const msgText = msg.text || msg.body || '';
+          return `[${idx + 1}] From: ${from} | Time: ${timestamp}\n${msgText}`;
+        })
+        .join('\n\n---\n\n');
+
+      userMessage = `Thread History (${threadContext.messages.length} messages):\n\n${threadHistory}\n\n---\n\n${userMessage}`;
+    }
 
     try {
       const emailContent = await this.chatGPTService.sendMessage(
@@ -106,9 +124,7 @@ Generate a complete email body that offers these time slots professionally.`;
     meetingPurpose?: string,
   ): string {
     const greeting = recipientName ? `Dear ${recipientName},` : 'Hello,';
-    const purposeLine = meetingPurpose
-      ? `regarding ${meetingPurpose}`
-      : 'to discuss further';
+    const purposeLine = meetingPurpose ? `regarding ${meetingPurpose}` : 'to discuss further';
 
     const timeSlots = context.availableTimeSlots
       .map((slot, index) => {
@@ -138,6 +154,7 @@ I look forward to hearing from you.${signature}`;
     recipientName?: string,
     senderName?: string,
     meetingPurpose?: string,
+    threadContext: any = null,
   ): Promise<string> {
     const formattedDate = this.formatDateForEmail(context.confirmedTimeSlot.date);
     const timeRange = `${context.confirmedTimeSlot.startTime} - ${context.confirmedTimeSlot.endTime}`;
@@ -154,10 +171,11 @@ Rules:
 - Offer flexibility for any changes if needed
 - Include appropriate closing and signature if sender name is provided
 - Keep the tone warm but professional
-- DO NOT use any special formatting like bold (**text**) or markdown`,
+- DO NOT use any special formatting like bold (**text**) or markdown
+- If thread history is provided, reference the conversation context naturally`,
     };
 
-    const userMessage = `Generate an email with the following information:
+    let userMessage = `Generate an email with the following information:
 
 Action: Confirm meeting time
 ${recipientName ? `Recipient Name: ${recipientName}` : 'Recipient: (no specific name)'}
@@ -169,6 +187,19 @@ Date: ${formattedDate}
 Time: ${timeRange}
 
 Generate a complete email body that confirms this meeting professionally.`;
+
+    if (threadContext && threadContext.messages && threadContext.messages.length > 0) {
+      const threadHistory = threadContext.messages
+        .map((msg: any, idx: number) => {
+          const from = msg.from || 'Unknown';
+          const timestamp = msg.timestamp || msg.createdAt || 'Unknown time';
+          const msgText = msg.text || msg.body || '';
+          return `[${idx + 1}] From: ${from} | Time: ${timestamp}\n${msgText}`;
+        })
+        .join('\n\n---\n\n');
+
+      userMessage = `Thread History (${threadContext.messages.length} messages):\n\n${threadHistory}\n\n---\n\n${userMessage}`;
+    }
 
     try {
       const emailContent = await this.chatGPTService.sendMessage(
@@ -216,6 +247,7 @@ I look forward to meeting with you. If you need to make any changes, please don'
     recipientName?: string,
     senderName?: string,
     meetingPurpose?: string,
+    threadContext: any = null,
   ): Promise<string> {
     const proposedDate = this.formatDateForEmail(context.proposedTimeSlot.date);
     const proposedTime = `${context.proposedTimeSlot.startTime} - ${context.proposedTimeSlot.endTime}`;
@@ -241,10 +273,11 @@ Rules:
 - Ask the recipient to choose or suggest other alternatives
 - Include appropriate closing and signature if sender name is provided
 - Keep the tone warm, apologetic but professional
-- DO NOT use any special formatting like bold (**text**) or markdown`,
+- DO NOT use any special formatting like bold (**text**) or markdown
+- If thread history is provided, reference the conversation context naturally`,
     };
 
-    const userMessage = `Generate an email with the following information:
+    let userMessage = `Generate an email with the following information:
 
 Action: Counter-offer with alternative meeting times
 ${recipientName ? `Recipient Name: ${recipientName}` : 'Recipient: (no specific name)'}
@@ -260,6 +293,19 @@ ${alternativeSlots}
 
 Generate a complete email body that politely declines the original time and proposes these alternatives professionally.`;
 
+    if (threadContext && threadContext.messages && threadContext.messages.length > 0) {
+      const threadHistory = threadContext.messages
+        .map((msg: any, idx: number) => {
+          const from = msg.from || 'Unknown';
+          const timestamp = msg.timestamp || msg.createdAt || 'Unknown time';
+          const msgText = msg.text || msg.body || '';
+          return `[${idx + 1}] From: ${from} | Time: ${timestamp}\n${msgText}`;
+        })
+        .join('\n\n---\n\n');
+
+      userMessage = `Thread History (${threadContext.messages.length} messages):\n\n${threadHistory}\n\n---\n\n${userMessage}`;
+    }
+
     try {
       const emailContent = await this.chatGPTService.sendMessage(
         userMessage,
@@ -271,7 +317,12 @@ Generate a complete email body that politely declines the original time and prop
     } catch (error) {
       this.logger.error(`Error generating counter-offer email with AI: ${error.message}`);
       // Fallback to simple template
-      return this.generateSimpleCounterOfferEmail(context, recipientName, senderName, meetingPurpose);
+      return this.generateSimpleCounterOfferEmail(
+        context,
+        recipientName,
+        senderName,
+        meetingPurpose,
+      );
     }
   }
 
@@ -282,9 +333,7 @@ Generate a complete email body that politely declines the original time and prop
     meetingPurpose?: string,
   ): string {
     const greeting = recipientName ? `Dear ${recipientName},` : 'Hello,';
-    const purposeLine = meetingPurpose
-      ? ` regarding ${meetingPurpose}`
-      : '';
+    const purposeLine = meetingPurpose ? ` regarding ${meetingPurpose}` : '';
 
     const proposedDate = this.formatDateForEmail(context.proposedTimeSlot.date);
     const proposedTime = `${context.proposedTimeSlot.startTime} - ${context.proposedTimeSlot.endTime}`;

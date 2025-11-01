@@ -50,9 +50,7 @@ describe('AgentMailService', () => {
         },
       };
 
-      jest
-        .spyOn(service['client'].inboxes, 'list')
-        .mockResolvedValue(mockAsyncIterator as any);
+      jest.spyOn(service['client'].inboxes, 'list').mockResolvedValue(mockAsyncIterator as any);
 
       const result = await service.listInboxes();
       expect(result).toEqual(mockInboxes);
@@ -71,9 +69,7 @@ describe('AgentMailService', () => {
       };
 
       const params = { limit: 10, ascending: true };
-      jest
-        .spyOn(service['client'].threads, 'list')
-        .mockResolvedValue(mockAsyncIterator as any);
+      jest.spyOn(service['client'].threads, 'list').mockResolvedValue(mockAsyncIterator as any);
 
       const result = await service.listThreads(params);
       expect(result).toEqual(mockThreads);
@@ -83,9 +79,7 @@ describe('AgentMailService', () => {
   describe('getThread', () => {
     it('should call client.threads.get with threadId', async () => {
       const mockThread = { id: '123', subject: 'Test Thread' };
-      jest
-        .spyOn(service['client'].threads, 'get')
-        .mockResolvedValue(mockThread as any);
+      jest.spyOn(service['client'].threads, 'get').mockResolvedValue(mockThread as any);
 
       const result = await service.getThread('123');
       expect(result).toEqual(mockThread);
@@ -102,10 +96,7 @@ describe('AgentMailService', () => {
 
       const result = await service.getThreadAttachment('123', 'att-456');
       expect(result).toEqual(mockAttachment);
-      expect(service['client'].threads.getAttachment).toHaveBeenCalledWith(
-        '123',
-        'att-456',
-      );
+      expect(service['client'].threads.getAttachment).toHaveBeenCalledWith('123', 'att-456');
     });
   });
 });
