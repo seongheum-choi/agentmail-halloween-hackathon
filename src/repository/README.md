@@ -1,6 +1,6 @@
-# User Repository
+# Repository Module
 
-NestJS repository for managing users with Convex backend and Zod validation.
+NestJS repositories for managing users and inboxes with Convex backend and Zod validation.
 
 ## Setup
 
@@ -20,7 +20,9 @@ import { RepositoryModule } from './repository/repository.module';
 export class YourModule {}
 ```
 
-## Usage Example
+## Usage Examples
+
+### Users Repository
 
 ```typescript
 import { Injectable } from '@nestjs/common';
@@ -69,26 +71,88 @@ export class UserService {
 }
 ```
 
+### Inboxes Repository
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { InboxesRepository } from './repository/inboxes.repository';
+
+@Injectable()
+export class InboxService {
+  constructor(private readonly inboxesRepository: InboxesRepository) {}
+
+  async getInboxByInboxId(inboxId: string) {
+    return await this.inboxesRepository.getByInboxId({ inboxId });
+  }
+
+  async getInboxesByUser(userId: string) {
+    return await this.inboxesRepository.getListByUser({ userId });
+  }
+
+  async createInbox(userId: string) {
+    return await this.inboxesRepository.create({
+      inboxId: 'inbox-123',
+      user: userId,
+      name: 'My Inbox',
+      persona: 'Professional assistant',
+    });
+  }
+
+  async updateInbox(id: string) {
+    return await this.inboxesRepository.update({
+      id,
+      name: 'Updated Inbox Name',
+      persona: 'Friendly helper',
+    });
+  }
+
+  async deleteInbox(id: string) {
+    return await this.inboxesRepository.delete({ id });
+  }
+}
+```
+
 ## API Methods
 
-### `getByEmail(request: GetUserByEmailRequest): Promise<User | null>`
+### UsersRepository
+
+#### `getByEmail(request: GetUserByEmailRequest): Promise<User | null>`
 Retrieves a user by email address.
 
-### `getById(request: GetUserByIdRequest): Promise<User | null>`
+#### `getById(request: GetUserByIdRequest): Promise<User | null>`
 Retrieves a user by ID.
 
-### `create(request: CreateUserRequest): Promise<string>`
+#### `create(request: CreateUserRequest): Promise<string>`
 Creates a new user and returns the user ID.
 
-### `update(request: UpdateUserRequest): Promise<string>`
+#### `update(request: UpdateUserRequest): Promise<string>`
 Updates an existing user and returns the user ID.
 
-### `delete(request: DeleteUserRequest): Promise<string>`
+#### `delete(request: DeleteUserRequest): Promise<string>`
 Deletes a user and returns the user ID.
+
+### InboxesRepository
+
+#### `getByInboxId(request: GetInboxByInboxIdRequest): Promise<Inbox | null>`
+Retrieves an inbox by inboxId.
+
+#### `getListByUser(request: GetInboxListByUserRequest): Promise<Inbox[]>`
+Retrieves all inboxes for a specific user.
+
+#### `create(request: CreateInboxRequest): Promise<string>`
+Creates a new inbox and returns the inbox ID.
+
+#### `update(request: UpdateInboxRequest): Promise<string>`
+Updates an existing inbox and returns the inbox ID.
+
+#### `delete(request: DeleteInboxRequest): Promise<string>`
+Deletes an inbox and returns the inbox ID.
 
 ## Validation
 
-All requests and responses are validated using Zod schemas defined in [dto/user.dto.ts](dto/user.dto.ts).
+All requests and responses are validated using Zod schemas defined in:
+- [dto/user.dto.ts](dto/user.dto.ts) - User DTOs
+- [dto/inbox.dto.ts](dto/inbox.dto.ts) - Inbox DTOs
 
 ## Error Handling
 
