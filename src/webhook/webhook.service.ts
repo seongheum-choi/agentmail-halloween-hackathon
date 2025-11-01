@@ -113,10 +113,38 @@ export class WebhookService {
       meetingPurpose: message.subject,
     });
 
+    let icsContent: string | undefined;
+    if (actionResult.action === EmailAction.CONFIRM && timeSuggestions.length > 0) {
+      const confirmedSlot = timeSuggestions[0];
+      const startDateTime = new Date(`${confirmedSlot.date}T${confirmedSlot.startTime}:00`);
+      const endDateTime = new Date(`${confirmedSlot.date}T${confirmedSlot.endTime}:00`);
+
+      icsContent = this.calendarInviteService.generateICS({
+        summary: message.subject,
+        description: `Meeting confirmed: ${message.subject}`,
+        location: 'To be determined',
+        startTime: startDateTime,
+        endTime: endDateTime,
+        organizer: {
+          name: 'AgentMail AI',
+          email: message.to[0],
+        },
+        attendees: [
+          {
+            name: message.from.split('@')[0],
+            email: message.from,
+          },
+        ],
+      });
+
+      this.logger.log('Generated ICS for CONFIRM action');
+    }
+
     await this.agentMailService.replyToMessage({
       inboxId: message.inboxId,
       messageId: message.id,
       text: emailContentToSend,
+      icsContent,
       cc: null, // TODO: Fill the cc recipients from the user's profile
     });
   }
