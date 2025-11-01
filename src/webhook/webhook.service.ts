@@ -7,6 +7,7 @@ import { CalendarInviteService } from './services/calendar-invite.service';
 import { EmailResponseGeneratorService } from './services/email-response-generator.service';
 import { AgentMailService } from '../agentmail/services/agentmail.service';
 import { InboxesRepository, UsersRepository } from '@/repository';
+import { ChatGPTService } from '../agent/services/chatgpt.service';
 import {
   EmailContext,
   EmailAction,
@@ -31,6 +32,7 @@ export class WebhookService {
     private readonly agentMailService: AgentMailService,
     private readonly userRepository: UsersRepository,
     private readonly inboxRepository: InboxesRepository,
+    private readonly chatGPTService: ChatGPTService,
   ) {}
 
   async handleWebhook(payload: WebhookPayloadDto): Promise<void> {
@@ -137,7 +139,7 @@ export class WebhookService {
       threadContext,
     );
 
-    const icsContent = this.generateICSForConfirm(actionResult.action, timeSuggestions, message);
+    const icsContent = await this.generateICSForConfirm(actionResult.action, timeSuggestions, message);
 
     await this.agentMailService.replyToMessage({
       inboxId: message.inboxId,
@@ -148,11 +150,62 @@ export class WebhookService {
     });
   }
 
-  private generateICSForConfirm(
+  private async generateCalendarTitle(subject: string): Promise<string> {
+    // Clean up subject by removing Re:, RE:, Fwd:, FW: etc.
+    const cleanSubject = subject
+      .replace(/^(Re|RE|Fwd|FW|Fw):\s*/gi, '')
+      .trim();
+
+    try {
+      const systemMessage = {
+        role: 'system' as const,
+        content: `You are a professional calendar event title generator.
+Convert email subjects into concise, professional calendar event titles.
+
+Rules:
+- Keep it short (max 50 characters)
+- Remove unnecessary prefixes like "Re:", "Fwd:", etc.
+- Make it clear and descriptive
+- Use title case
+- Focus on the meeting topic/purpose
+- DO NOT add quotes, markdown, or special formatting
+- Return ONLY the title text, nothing else
+
+Examples:
+Input: "Re: Meeting about Q4 planning"
+Output: Q4 Planning Discussion
+
+Input: "Re: Fwd: Coffee chat next week?"
+Output: Coffee Chat
+
+Input: "Project kickoff - new website redesign"
+Output: Website Redesign Kickoff`,
+      };
+
+      const calendarTitle = await this.chatGPTService.sendMessage(
+        `Generate a calendar event title for: "${cleanSubject}"`,
+        [systemMessage],
+        0.3,
+        100,
+      );
+
+      // Clean up any potential formatting issues
+      const cleanedTitle = calendarTitle.trim().replace(/^["']|["']$/g, '');
+
+      this.logger.log(`Generated calendar title: "${cleanedTitle}" from "${cleanSubject}"`);
+
+      return cleanedTitle;
+    } catch (error) {
+      this.logger.warn(`Failed to generate calendar title with AI: ${error.message}. Using cleaned subject.`);
+      return cleanSubject;
+    }
+  }
+
+  private async generateICSForConfirm(
     action: EmailAction,
     timeSuggestions: any[],
     message: EnrichedMessage,
-  ): string | undefined {
+  ): Promise<string | undefined> {
     if (action !== EmailAction.CONFIRM || timeSuggestions.length === 0) {
       return undefined;
     }
@@ -161,8 +214,10 @@ export class WebhookService {
     const startDateTime = new Date(`${confirmedSlot.date}T${confirmedSlot.startTime}:00`);
     const endDateTime = new Date(`${confirmedSlot.date}T${confirmedSlot.endTime}:00`);
 
+    const calendarTitle = await this.generateCalendarTitle(message.subject);
+
     const icsContent = this.calendarInviteService.generateICS({
-      summary: message.subject,
+      summary: calendarTitle,
       description: `Meeting confirmed: ${message.subject}`,
       location: 'To be determined',
       startTime: startDateTime,
@@ -261,7 +316,7 @@ export class WebhookService {
         to: [message.to],
       };
 
-      const icsContent = this.generateICSForConfirm(
+      const icsContent = await this.generateICSForConfirm(
         actionResult.action,
         actionResult.timeSuggestions || [],
         enrichedMessage,
@@ -272,7 +327,7 @@ export class WebhookService {
         messageId: message.id,
         text: emailText,
         icsContent,
-        cc: null, // TODO: Get cc from user profile if needed
+        cc: [targetUser.email], // TODO: Get cc from user profile if needed
       });
 
       this.logger.log(`Confirmation email sent to: ${message.from}`);
@@ -310,7 +365,7 @@ export class WebhookService {
           to: [message.to],
         };
 
-        const icsContent = this.generateICSForConfirm(
+        const icsContent = await this.generateICSForConfirm(
           timeAvailablityActionResult.action,
           actionResult.timeSuggestions || [],
           enrichedMessage,
@@ -353,7 +408,7 @@ export class WebhookService {
           inboxId: message.inboxId,
           messageId: message.id,
           text: emailText,
-          cc: [targetUser.email],
+          cc: null,
         });
       }
     } else if (actionResult.action === EmailAction.OFFER) {
@@ -382,7 +437,7 @@ export class WebhookService {
         inboxId: message.inboxId,
         messageId: message.id,
         text: emailText,
-        cc: [targetUser.email],
+        cc: null,
       });
     }
 
