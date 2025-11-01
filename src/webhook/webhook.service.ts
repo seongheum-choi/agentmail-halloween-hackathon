@@ -77,13 +77,14 @@ export class WebhookService {
 
     const availableSlots = await this.schedulerService.findAvailableSlots(
       {
-        meetingDuration: 60,
+        meetingDuration: 30, // TODO: Fill the meeting duration from the message object
         workingHours: {
+          // TODO: Fill the working hours from the user's profile
           start: '09:00',
           end: '18:00',
         },
       },
-      'anonymous',
+      'anonymous', // TODO: Fill the user id from the message object
     );
 
     this.logger.log(`Found ${availableSlots.length} available slots`);
@@ -132,12 +133,13 @@ Please find the calendar invitation attached. Looking forward to meeting with yo
 Best regards,
 AgentMail AI`;
 
+      this.logger.log(`Whole Message object: ${JSON.stringify(message, null, 2)}`);
       await this.agentMailService.replyToMessage({
         inboxId: message.inboxId,
         messageId: message.id,
         text: emailText,
         icsContent,
-        cc: message.to.split(',').map((email: string) => email.trim()),
+        cc: null, // TODO: Fill the cc recipients from the user's profile
       });
 
       this.logger.log(`Response email sent to: ${message.from}`);
