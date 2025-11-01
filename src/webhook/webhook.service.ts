@@ -7,6 +7,7 @@ import { CalendarInviteService } from './services/calendar-invite.service';
 import { EmailResponseGeneratorService } from './services/email-response-generator.service';
 import { AgentMailService } from '../agentmail/services/agentmail.service';
 import { InboxesRepository, UsersRepository } from '@/repository';
+import { ChatGPTService } from '../agent/services/chatgpt.service';
 import {
   EmailContext,
   EmailAction,
@@ -31,6 +32,7 @@ export class WebhookService {
     private readonly agentMailService: AgentMailService,
     private readonly userRepository: UsersRepository,
     private readonly inboxRepository: InboxesRepository,
+    private readonly chatGPTService: ChatGPTService,
   ) {}
 
   private formatMeetingTitle(purpose: string, date: string, time: string): string {
@@ -132,58 +134,123 @@ export class WebhookService {
       }
     })();
 
-    const { emailContent, subject } = await this.emailResponseGeneratorService.generateEmail(
+    const inbox = await this.inboxRepository.getByInboxId({ inboxId: message.inboxId });
+    const emailResponse = await this.emailResponseGeneratorService.generateEmail(
       {
         action: actionResult.action,
         context,
         recipientName: message.from.split('@')[0],
-        senderName: 'AgentMail AI',
+        senderName: inbox?.name || 'AgentMail AI',
         meetingPurpose: message.subject,
       },
       threadContext,
+      inbox?.persona,
+      inbox?.name,
     );
 
-    let icsContent: string | undefined;
-    let meetingTitle: string | undefined;
-
-    if (timeSuggestions.length > 0) {
-      const primarySlot = timeSuggestions[0];
-      meetingTitle = this.formatMeetingTitle(subject, primarySlot.date, primarySlot.startTime);
-
-      if (actionResult.action === EmailAction.CONFIRM) {
-        const startDateTime = new Date(`${primarySlot.date}T${primarySlot.startTime}:00`);
-        const endDateTime = new Date(`${primarySlot.date}T${primarySlot.endTime}:00`);
-
-        icsContent = this.calendarInviteService.generateICS({
-          summary: meetingTitle,
-          description: `Meeting confirmed: ${subject}`,
-          location: 'To be determined',
-          startTime: startDateTime,
-          endTime: endDateTime,
-          organizer: {
-            name: 'AgentMail AI',
-            email: message.to[0],
-          },
-          attendees: [
-            {
-              name: message.from.split('@')[0],
-              email: message.from,
-            },
-          ],
-        });
-
-        this.logger.log('Generated ICS for CONFIRM action');
-      }
-    }
+    const icsContent = await this.generateICSForConfirm(
+      actionResult.action,
+      timeSuggestions,
+      message,
+    );
 
     await this.agentMailService.replyToMessage({
       inboxId: message.inboxId,
       messageId: message.id,
-      text: emailContent,
-      subject: meetingTitle,
+      text: emailResponse.emailContent,
+      subject: emailResponse.subject,
       icsContent,
       cc: null, // TODO: Fill the cc recipients from the user's profile
     });
+  }
+
+  private async generateCalendarTitle(subject: string): Promise<string> {
+    // Clean up subject by removing Re:, RE:, Fwd:, FW: etc.
+    const cleanSubject = subject.replace(/^(Re|RE|Fwd|FW|Fw):\s*/gi, '').trim();
+
+    try {
+      const systemMessage = {
+        role: 'system' as const,
+        content: `You are a professional calendar event title generator.
+Convert email subjects into concise, professional calendar event titles.
+
+Rules:
+- Keep it short (max 50 characters)
+- Remove unnecessary prefixes like "Re:", "Fwd:", etc.
+- Make it clear and descriptive
+- Use title case
+- Focus on the meeting topic/purpose
+- DO NOT add quotes, markdown, or special formatting
+- Return ONLY the title text, nothing else
+
+Examples:
+Input: "Re: Meeting about Q4 planning"
+Output: Q4 Planning Discussion
+
+Input: "Re: Fwd: Coffee chat next week?"
+Output: Coffee Chat
+
+Input: "Project kickoff - new website redesign"
+Output: Website Redesign Kickoff`,
+      };
+
+      const calendarTitle = await this.chatGPTService.sendMessage(
+        `Generate a calendar event title for: "${cleanSubject}"`,
+        [systemMessage],
+        0.3,
+        100,
+      );
+
+      // Clean up any potential formatting issues
+      const cleanedTitle = calendarTitle.trim().replace(/^["']|["']$/g, '');
+
+      this.logger.log(`Generated calendar title: "${cleanedTitle}" from "${cleanSubject}"`);
+
+      return cleanedTitle;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to generate calendar title with AI: ${error.message}. Using cleaned subject.`,
+      );
+      return cleanSubject;
+    }
+  }
+
+  private async generateICSForConfirm(
+    action: EmailAction,
+    timeSuggestions: any[],
+    message: EnrichedMessage,
+  ): Promise<string | undefined> {
+    if (action !== EmailAction.CONFIRM || timeSuggestions.length === 0) {
+      return undefined;
+    }
+
+    const confirmedSlot = timeSuggestions[0];
+    const startDateTime = new Date(`${confirmedSlot.date}T${confirmedSlot.startTime}:00`);
+    const endDateTime = new Date(`${confirmedSlot.date}T${confirmedSlot.endTime}:00`);
+
+    const calendarTitle = await this.generateCalendarTitle(message.subject);
+
+    const icsContent = this.calendarInviteService.generateICS({
+      summary: calendarTitle,
+      description: `Meeting confirmed: ${message.subject}`,
+      location: 'To be determined',
+      startTime: startDateTime,
+      endTime: endDateTime,
+      organizer: {
+        name: 'AgentMail AI',
+        email: message.to[0],
+      },
+      attendees: [
+        {
+          name: message.from.split('@')[0],
+          email: message.from,
+        },
+      ],
+    });
+
+    this.logger.log('Generated ICS for CONFIRM action');
+
+    return icsContent;
   }
 
   // Handle webhook with AI classification and action selection
@@ -248,19 +315,41 @@ export class WebhookService {
     );
 
     if (actionResult.action === EmailAction.CONFIRM) {
-      const emailResponse = await this.emailResponseGeneratorService.generateEmail({
-        action: EmailAction.CONFIRM,
-        context: {
-          confirmedTimeSlot: actionResult.timeSuggestions ? actionResult.timeSuggestions[0] : null,
+      // inboxUser and targetUser are already fetched above (lines 284-285)
+      const inbox = await this.inboxRepository.getByInboxId({ inboxId: message.inboxId });
+
+      const emailResponse = await this.emailResponseGeneratorService.generateEmail(
+        {
+          action: EmailAction.CONFIRM,
+          context: {
+            confirmedTimeSlot: actionResult.timeSuggestions
+              ? actionResult.timeSuggestions[0]
+              : null,
+          },
+          recipientName: message.from.split('@')[0],
+          senderName: inbox?.name || 'AgentMail AI',
+          meetingPurpose: message.subject,
         },
-        recipientName: message.from.split('@')[0],
-        senderName: 'AgentMail AI',
-        meetingPurpose: message.subject,
-      });
+        null,
+        inbox?.persona,
+        inbox?.name,
+      );
+
+      const enrichedMessage = {
+        ...message,
+        to: [message.to],
+      };
+
+      const icsContent = await this.generateICSForConfirm(
+        actionResult.action,
+        actionResult.timeSuggestions || [],
+        enrichedMessage,
+      );
 
       await this.agentMailService.replyToMessage({
         inboxId: message.inboxId,
         messageId: message.id,
+        icsContent,
         text: emailResponse.emailContent,
         subject: emailResponse.subject,
         cc: null, // TODO: Get cc from user profile if needed
@@ -284,21 +373,40 @@ export class WebhookService {
       );
 
       if (timeAvailablityActionResult.action === EmailAction.CONFIRM) {
-        const emailResponse = await this.emailResponseGeneratorService.generateEmail({
-          action: EmailAction.CONFIRM,
-          context: {
-            confirmedTimeSlot: actionResult.timeSuggestions
-              ? actionResult.timeSuggestions[0]
-              : null,
+        const inbox = await this.inboxRepository.getByInboxId({ inboxId: message.inboxId });
+
+        const emailResponse = await this.emailResponseGeneratorService.generateEmail(
+          {
+            action: EmailAction.CONFIRM,
+            context: {
+              confirmedTimeSlot: actionResult.timeSuggestions
+                ? actionResult.timeSuggestions[0]
+                : null,
+            },
+            recipientName: message.from.split('@')[0],
+            senderName: inbox?.name || 'AgentMail AI',
+            meetingPurpose: message.subject,
           },
-          recipientName: message.from.split('@')[0],
-          senderName: 'AgentMail AI',
-          meetingPurpose: message.subject,
-        });
+          null,
+          inbox?.persona,
+          inbox?.name,
+        );
+
+        const enrichedMessage = {
+          ...message,
+          to: [message.to],
+        };
+
+        const icsContent = await this.generateICSForConfirm(
+          timeAvailablityActionResult.action,
+          actionResult.timeSuggestions || [],
+          enrichedMessage,
+        );
 
         await this.agentMailService.replyToMessage({
           inboxId: message.inboxId,
           messageId: message.id,
+          icsContent,
           text: emailResponse.emailContent,
           subject: emailResponse.subject,
           cc: [targetUser.email],
@@ -318,23 +426,32 @@ export class WebhookService {
           `sandbox:${targetUser.email}`, // TODO: Get user ID from message or context as needed
         );
 
-        const emailResponse = await this.emailResponseGeneratorService.generateEmail({
-          action: EmailAction.COUNTEROFFER,
-          context: {
-            proposedTimeSlot: actionResult.timeSuggestions ? actionResult.timeSuggestions[0] : null,
-            alternativeTimeSlots: availableSlots,
+        const inbox = await this.inboxRepository.getByInboxId({ inboxId: message.inboxId });
+
+        const emailResponse = await this.emailResponseGeneratorService.generateEmail(
+          {
+            action: EmailAction.COUNTEROFFER,
+            context: {
+              proposedTimeSlot: actionResult.timeSuggestions
+                ? actionResult.timeSuggestions[0]
+                : null,
+              alternativeTimeSlots: availableSlots,
+            },
+            recipientName: message.from.split('@')[0],
+            senderName: inbox?.name || 'AgentMail AI',
+            meetingPurpose: message.subject,
           },
-          recipientName: message.from.split('@')[0],
-          senderName: 'AgentMail AI',
-          meetingPurpose: message.subject,
-        });
+          null,
+          inbox?.persona,
+          inbox?.name,
+        );
 
         await this.agentMailService.replyToMessage({
           inboxId: message.inboxId,
           messageId: message.id,
+          cc: null,
           text: emailResponse.emailContent,
           subject: emailResponse.subject,
-          cc: [targetUser.email],
         });
       }
     } else if (actionResult.action === EmailAction.OFFER) {
@@ -349,22 +466,29 @@ export class WebhookService {
         `sandbox:${targetUser.email}`, // TODO: Get user ID from message or context as needed
       );
 
-      const emailResponse = await this.emailResponseGeneratorService.generateEmail({
-        action: EmailAction.OFFER,
-        context: {
-          availableTimeSlots: availableSlots,
+      const inbox = await this.inboxRepository.getByInboxId({ inboxId: message.inboxId });
+
+      const emailResponse = await this.emailResponseGeneratorService.generateEmail(
+        {
+          action: EmailAction.OFFER,
+          context: {
+            availableTimeSlots: availableSlots,
+          },
+          recipientName: message.from.split('@')[0],
+          senderName: inbox?.name || 'AgentMail AI',
+          meetingPurpose: message.subject,
         },
-        recipientName: message.from.split('@')[0],
-        senderName: 'AgentMail AI',
-        meetingPurpose: message.subject,
-      });
+        null,
+        inbox?.persona,
+        inbox?.name,
+      );
 
       await this.agentMailService.replyToMessage({
         inboxId: message.inboxId,
         messageId: message.id,
+        cc: null,
         text: emailResponse.emailContent,
         subject: emailResponse.subject,
-        cc: [targetUser.email],
       });
     }
 

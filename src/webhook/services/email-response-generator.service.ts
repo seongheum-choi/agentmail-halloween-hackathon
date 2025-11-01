@@ -24,6 +24,8 @@ export class EmailResponseGeneratorService {
   async generateEmail(
     request: EmailGenerationRequest,
     threadContext: any = null,
+    inboxPersona?: string,
+    inboxName?: string,
   ): Promise<{ emailContent: string; subject: string }> {
     this.logger.log(`Generating email for action: ${request.action}`);
 
@@ -35,6 +37,8 @@ export class EmailResponseGeneratorService {
           request.senderName,
           request.meetingPurpose,
           threadContext,
+          inboxPersona,
+          inboxName,
         );
       case EmailAction.CONFIRM:
         return this.generateConfirmEmail(
@@ -43,6 +47,8 @@ export class EmailResponseGeneratorService {
           request.senderName,
           request.meetingPurpose,
           threadContext,
+          inboxPersona,
+          inboxName,
         );
       case EmailAction.COUNTEROFFER:
         return this.generateCounterOfferEmail(
@@ -51,6 +57,8 @@ export class EmailResponseGeneratorService {
           request.senderName,
           request.meetingPurpose,
           threadContext,
+          inboxPersona,
+          inboxName,
         );
       case EmailAction.CHECK_TIME:
         return this.generateCheckTimeEmail(
@@ -71,6 +79,8 @@ export class EmailResponseGeneratorService {
     senderName?: string,
     meetingPurpose?: string,
     threadContext: any = null,
+    inboxPersona?: string,
+    inboxName?: string,
   ): Promise<{ emailContent: string; subject: string }> {
     const timeSlots = context.availableTimeSlots
       .map((slot, index) => {
@@ -79,6 +89,14 @@ export class EmailResponseGeneratorService {
         return `${index + 1}. ${formattedDate} at ${timeRange}`;
       })
       .join('\n');
+
+    const personaContext = inboxPersona
+      ? `\n\nIMPORTANT - Write as this person:
+Name: ${inboxName || senderName || 'the sender'}
+Persona: ${inboxPersona}
+
+Write the email in a way that matches this persona's personality, communication style, and tone. Make it sound like this specific person wrote it, incorporating their unique characteristics and mannerisms.`
+      : '';
 
     const systemMessage = {
       role: 'system' as const,
@@ -92,7 +110,7 @@ Rules:
 - Include appropriate closing and signature if sender name is provided
 - Keep the tone warm but professional
 - DO NOT use any special formatting like bold (**text**) or markdown
-- If thread history is provided, reference the conversation context naturally
+- If thread history is provided, reference the conversation context naturally${personaContext},
 - Create a concise and professional subject line based on the meeting purpose`,
     };
 
@@ -186,9 +204,19 @@ I look forward to hearing from you.${signature}`;
     senderName?: string,
     meetingPurpose?: string,
     threadContext: any = null,
+    inboxPersona?: string,
+    inboxName?: string,
   ): Promise<{ subject: string; emailContent: string }> {
     const formattedDate = this.formatDateForEmail(context.confirmedTimeSlot.date);
     const timeRange = `${context.confirmedTimeSlot.startTime} - ${context.confirmedTimeSlot.endTime}`;
+
+    const personaContext = inboxPersona
+      ? `\n\nIMPORTANT - Write as this person:
+Name: ${inboxName || senderName || 'the sender'}
+Persona: ${inboxPersona}
+
+Write the email in a way that matches this persona's personality, communication style, and tone. Make it sound like this specific person wrote it, incorporating their unique characteristics and mannerisms.`
+      : '';
 
     const systemMessage = {
       role: 'system' as const,
@@ -203,7 +231,7 @@ Rules:
 - Include appropriate closing and signature if sender name is provided
 - Keep the tone warm but professional
 - DO NOT use any special formatting like bold (**text**) or markdown
-- If thread history is provided, reference the conversation context naturally
+- If thread history is provided, reference the conversation context naturally${personaContext},
 - Create a concise and professional subject line for the confirmation`,
     };
 
@@ -290,6 +318,8 @@ I look forward to meeting with you. If you need to make any changes, please don'
     senderName?: string,
     meetingPurpose?: string,
     threadContext: any = null,
+    inboxPersona?: string,
+    inboxName?: string,
   ): Promise<{ subject: string; emailContent: string }> {
     const proposedDate = this.formatDateForEmail(context.proposedTimeSlot.date);
     const proposedTime = `${context.proposedTimeSlot.startTime} - ${context.proposedTimeSlot.endTime}`;
@@ -301,6 +331,14 @@ I look forward to meeting with you. If you need to make any changes, please don'
         return `${index + 1}. ${formattedDate} at ${timeRange}`;
       })
       .join('\n');
+
+    const personaContext = inboxPersona
+      ? `\n\nIMPORTANT - Write as this person:
+Name: ${inboxName || senderName || 'the sender'}
+Persona: ${inboxPersona}
+
+Write the email in a way that matches this persona's personality, communication style, and tone. Make it sound like this specific person wrote it, incorporating their unique characteristics and mannerisms.`
+      : '';
 
     const systemMessage = {
       role: 'system' as const,
@@ -316,7 +354,7 @@ Rules:
 - Include appropriate closing and signature if sender name is provided
 - Keep the tone warm, apologetic but professional
 - DO NOT use any special formatting like bold (**text**) or markdown
-- If thread history is provided, reference the conversation context naturally
+- If thread history is provided, reference the conversation context naturally${personaContext},
 - Create a concise and professional subject line for the counter-offer`,
     };
 
