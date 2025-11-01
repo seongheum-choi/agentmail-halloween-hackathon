@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
+import { ChatGPTService } from '../../agent/services/chatgpt.service';
 
 export interface ClassificationResult {
   labels: string[];
@@ -11,34 +10,20 @@ export interface ClassificationResult {
 @Injectable()
 export class EmailClassifierService {
   private readonly logger = new Logger(EmailClassifierService.name);
-  private readonly openai: OpenAI;
 
-  constructor(private readonly configService: ConfigService) {
-    const apiKey = this.configService.get<string>('OPENAI_API_KEY');
-    if (!apiKey) {
-      this.logger.warn('OPENAI_API_KEY not found in environment variables');
-    }
-    this.openai = new OpenAI({
-      apiKey: apiKey || '',
-    });
-  }
+  constructor(private readonly chatGPTService: ChatGPTService) {}
 
   async classifyEmail(subject: string, text: string): Promise<ClassificationResult> {
     this.logger.log(`Classifying email: ${subject}`);
 
     try {
-      const model = this.configService.get<string>('OPENAI_MODEL') || 'gpt-4o-mini';
-
-      const completion = await this.openai.chat.completions.create({
-        model,
-        messages: [
-          {
-            role: 'system',
-            content: `You are an email classification system. Classify emails into one or more of these categories: SPAM, RESERVATION.
+      const systemMessage = {
+        role: 'system' as const,
+        content: `You are an email classification system of secretaries. Classify emails into one or more of these categories: SPAM, RESERVATION.
 
 Rules:
 - SPAM: Unsolicited commercial emails, phishing attempts, suspicious content
-- RESERVATION: Emails about bookings, appointments, reservations at restaurants, hotels, events, etc.
+- RESERVATION: Emails about appointments, reservations at businesses, meeting or conference calls.
 
 Respond ONLY with a JSON object in this exact format:
 {"labels": ["LABEL1", "LABEL2"], "isSpam": boolean, "isReservation": boolean}
@@ -47,22 +32,18 @@ Examples:
 - Hotel booking confirmation -> {"labels": ["RESERVATION"], "isSpam": false, "isReservation": true}
 - Promotional email -> {"labels": ["SPAM"], "isSpam": true, "isReservation": false}
 - Restaurant reservation -> {"labels": ["RESERVATION"], "isSpam": false, "isReservation": true}`,
-          },
-          {
-            role: 'user',
-            content: `Subject: ${subject}\n\nBody: ${text.substring(0, 1000)}`,
-          },
-        ],
-        temperature: 0.3,
-        max_tokens: 100,
-      });
+      };
 
-      const content = completion.choices[0]?.message?.content;
-      if (!content) {
-        throw new Error('No response from OpenAI');
-      }
+      const userMessage = `Subject: ${subject}\n\nBody: ${text.substring(0, 1000)}`;
 
-      const result = JSON.parse(content) as ClassificationResult;
+      const response = await this.chatGPTService.sendMessage(
+        userMessage,
+        [systemMessage],
+        0.3,
+        100,
+      );
+
+      const result = JSON.parse(response) as ClassificationResult;
       this.logger.log(`Classification result: ${JSON.stringify(result)}`);
 
       return result;

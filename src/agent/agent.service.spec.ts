@@ -1,18 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { AgentService } from './agent.service';
-import { AnthropicService } from './services/anthropic.service';
+import { ChatGPTService } from './services/chatgpt.service';
 
 describe('AgentService', () => {
   let service: AgentService;
-  let anthropicService: AnthropicService;
+  let chatgptService: ChatGPTService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AgentService,
         {
-          provide: AnthropicService,
+          provide: ChatGPTService,
           useValue: {
             sendMessage: jest.fn(),
           },
@@ -27,7 +27,7 @@ describe('AgentService', () => {
     }).compile();
 
     service = module.get<AgentService>(AgentService);
-    anthropicService = module.get<AnthropicService>(AnthropicService);
+    chatgptService = module.get<ChatGPTService>(ChatGPTService);
   });
 
   it('should be defined', () => {
@@ -37,7 +37,7 @@ describe('AgentService', () => {
   describe('chat', () => {
     it('should process chat request successfully', async () => {
       const mockResponse = 'Hello! How can I help you?';
-      jest.spyOn(anthropicService, 'sendMessage').mockResolvedValue(mockResponse);
+      jest.spyOn(chatgptService, 'sendMessage').mockResolvedValue(mockResponse);
 
       const result = await service.chat({
         message: 'Hello',
