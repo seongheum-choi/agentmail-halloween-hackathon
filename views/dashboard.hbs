@@ -1,0 +1,569 @@
+<html lang='en'>
+  <head>
+    <meta charset='UTF-8' />
+    <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+    <title>Dashboard - {{name}}</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .header {
+        background: white;
+        border-radius: 10px;
+        padding: 30px;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      .header h1 {
+        color: #333;
+        margin-bottom: 10px;
+      }
+
+      .header p {
+        color: #666;
+      }
+
+      .user-info {
+        background: white;
+        border-radius: 10px;
+        padding: 30px;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      .user-info h2 {
+        color: #333;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #667eea;
+        padding-bottom: 10px;
+      }
+
+      .info-grid {
+        display: block;
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+
+      .info-item {
+        padding: 15px;
+        background: #f7fafc;
+        border-radius: 8px;
+        border-left: 4px solid #667eea;
+      }
+
+      .info-label {
+        color: #666;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 5px;
+      }
+
+      .info-value {
+        color: #333;
+        font-size: 16px;
+      }
+
+      .editable {
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .editable:hover {
+        background: #edf2f7;
+      }
+
+      .edit-icon {
+        margin-left: 8px;
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+
+      .editable:hover .edit-icon {
+        opacity: 1;
+      }
+
+      .inboxes-section {
+        background: white;
+        border-radius: 10px;
+        padding: 30px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      .inboxes-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #667eea;
+        padding-bottom: 10px;
+      }
+
+      .inboxes-section h2 {
+        color: #333;
+        margin: 0;
+      }
+
+      .inbox-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+      }
+
+      .inbox-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 25px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s;
+        position: relative;
+      }
+
+      .inbox-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      .inbox-name {
+        font-size: 20px;
+        font-weight: 600;
+        margin-bottom: 10px;
+      }
+
+      .inbox-id {
+        font-size: 14px;
+        opacity: 0.9;
+        font-family: 'Courier New', monospace;
+        margin-bottom: 15px;
+        word-break: break-all;
+      }
+
+      .inbox-persona {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 12px;
+        border-radius: 6px;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .delete-btn {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        color: white;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+      }
+
+      .delete-btn:hover {
+        background: #ef4444;
+        transform: scale(1.1);
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+      }
+
+      .empty-state-icon {
+        font-size: 48px;
+        margin-bottom: 10px;
+      }
+
+      .badge {
+        display: inline-block;
+        background: #667eea;
+        color: white;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 600;
+        margin-left: 10px;
+      }
+
+      .btn {
+        background: #667eea;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        transition: all 0.2s;
+      }
+
+      .btn:hover {
+        background: #5568d3;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+      }
+
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .modal.active {
+        display: flex;
+      }
+
+      .modal-content {
+        background: white;
+        border-radius: 10px;
+        padding: 30px;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+      }
+
+      .modal-header {
+        margin-bottom: 20px;
+      }
+
+      .modal-header h3 {
+        color: #333;
+        margin-bottom: 5px;
+      }
+
+      .modal-header p {
+        color: #666;
+        font-size: 14px;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      .form-group label {
+        display: block;
+        color: #333;
+        font-weight: 600;
+        margin-bottom: 8px;
+        font-size: 14px;
+      }
+
+      .form-group input,
+      .form-group textarea {
+        width: 100%;
+        padding: 10px;
+        border: 2px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 14px;
+        font-family: inherit;
+        transition: border-color 0.2s;
+      }
+
+      .form-group input:focus,
+      .form-group textarea:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+
+      .form-group textarea {
+        resize: vertical;
+        min-height: 100px;
+      }
+
+      .modal-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+      }
+
+      .btn-secondary {
+        background: #e2e8f0;
+        color: #333;
+      }
+
+      .btn-secondary:hover {
+        background: #cbd5e0;
+      }
+
+      .time-inputs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        display: none;
+        z-index: 2000;
+      }
+
+      .notification.active {
+        display: block;
+        animation: slideIn 0.3s ease;
+      }
+
+      .notification.success {
+        border-left: 4px solid #10b981;
+      }
+
+      .notification.error {
+        border-left: 4px solid #ef4444;
+      }
+
+      @keyframes slideIn {
+        from {
+          transform: translateX(400px);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class='container'>
+      <div class='header'>
+        <h1>Welcome, {{name}}! 👋</h1>
+        <p>Your AgentMail Dashboard</p>
+      </div>
+
+      <div class='user-info'>
+        <h2>User Information</h2>
+        <div class='info-grid'>
+          <div class='info-item'>
+            <div class='info-label'>Email</div>
+            <div class='info-value'>{{email}}</div>
+          </div>
+          <div class='info-item'>
+            <div class='info-label'>Name</div>
+            <div class='info-value'>{{name}}</div>
+          </div>
+          <div class='info-item'>
+            <div class='info-label'>Timezone</div>
+            <div class='info-value'>{{preferences.timezone}}</div>
+          </div>
+          <div class='info-item editable' onclick='openWorkingHoursModal()'>
+            <div class='info-label'>Working Hours <span class='edit-icon'>✏️</span></div>
+            <div class='info-value' id='working-hours-display'>{{preferences.workingHours.start}}
+              -
+              {{preferences.workingHours.end}}</div>
+          </div>
+          <div class='info-item'>
+            <div class='info-label'>AgentMail Integration</div>
+            <div class='info-value'>{{integrations.agentMail}}</div>
+          </div>
+          <div class='info-item'>
+            <div class='info-label'>User ID</div>
+            <div
+              class='info-value'
+              style="font-family: 'Courier New', monospace; font-size: 14px;"
+            >{{_id}}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class='inboxes-section'>
+        <div class='inboxes-header'>
+          <h2>
+            Your Inboxes
+            <span class='badge' id='inbox-count'>{{inboxes.length}}</span>
+          </h2>
+          <button class='btn' onclick='openAddInboxModal()'>+ Add Inbox</button>
+        </div>
+        {{#if inboxes.length}}
+          <div class='inbox-grid' id='inbox-grid'>
+            {{#each inboxes}}
+              <div class='inbox-card' data-inbox-id='{{this._id}}'>
+                <button
+                  class='delete-btn'
+                  onclick="deleteInbox('{{this._id}}', '{{this.name}}')"
+                  title='Delete inbox'
+                >×</button>
+                <div class='inbox-name'>{{this.name}}</div>
+                <div class='inbox-id'>ID: {{this.inboxId}}</div>
+                <div class='inbox-persona'>
+                  <strong>Persona:</strong><br />
+                  {{this.persona}}
+                </div>
+              </div>
+            {{/each}}
+          </div>
+        {{else}}
+          <div class='empty-state' id='empty-state'>
+            <div class='empty-state-icon'>📭</div>
+            <p>No inboxes found. Create your first inbox to get started!</p>
+          </div>
+        {{/if}}
+      </div>
+    </div>
+
+    <div class='modal' id='working-hours-modal'>
+      <div class='modal-content'>
+        <div class='modal-header'>
+          <h3>Update Working Hours</h3>
+          <p>Set your preferred working hours</p>
+        </div>
+        <form id='working-hours-form' onsubmit='updateWorkingHours(event)'>
+          <div class='form-group'>
+            <label>Working Hours</label>
+            <div class='time-inputs'>
+              <div>
+                <input
+                  type='time'
+                  id='start-time'
+                  value='{{preferences.workingHours.start}}'
+                  required
+                />
+                <small style='color: #666;'>Start</small>
+              </div>
+              <div>
+                <input
+                  type='time'
+                  id='end-time'
+                  value='{{preferences.workingHours.end}}'
+                  required
+                />
+                <small style='color: #666;'>End</small>
+              </div>
+            </div>
+          </div>
+          <div class='modal-actions'>
+            <button
+              type='button'
+              class='btn btn-secondary'
+              onclick='closeWorkingHoursModal()'
+            >Cancel</button>
+            <button type='submit' class='btn'>Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class='modal' id='add-inbox-modal'>
+      <div class='modal-content'>
+        <div class='modal-header'>
+          <h3>Add New Inbox</h3>
+          <p>Create a new inbox with a custom persona</p>
+        </div>
+        <form id='add-inbox-form' onsubmit='addInbox(event)'>
+          <div class='form-group'>
+            <label>Inbox Name</label>
+            <input type='text' id='inbox-name' placeholder='e.g., Customer Support' required />
+          </div>
+          <div class='form-group'>
+            <label>Inbox ID</label>
+            <input type='text' id='inbox-id' placeholder='e.g., support@yourdomain.com' required />
+          </div>
+          <div class='form-group'>
+            <label>Persona</label>
+            <textarea
+              id='inbox-persona'
+              placeholder='Describe how this inbox should respond...'
+              required
+            ></textarea>
+          </div>
+          <div class='modal-actions'>
+            <button
+              type='button'
+              class='btn btn-secondary'
+              onclick='closeAddInboxModal()'
+            >Cancel</button>
+            <button type='submit' class='btn'>Create Inbox</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class='notification' id='notification'>
+      <span id='notification-message'></span>
+    </div>
+
+    <script>
+      const userId = '{{_id}}'; const userEmail = '{{email}}'; function openWorkingHoursModal() {
+      document.getElementById('working-hours-modal').classList.add('active'); } function
+      closeWorkingHoursModal() {
+      document.getElementById('working-hours-modal').classList.remove('active'); } function
+      openAddInboxModal() { document.getElementById('add-inbox-modal').classList.add('active'); }
+      function closeAddInboxModal() {
+      document.getElementById('add-inbox-modal').classList.remove('active');
+      document.getElementById('add-inbox-form').reset(); } function showNotification(message, type =
+      'success') { const notification = document.getElementById('notification'); const messageEl =
+      document.getElementById('notification-message'); messageEl.textContent = message;
+      notification.className = `notification ${type} active`; setTimeout(() => {
+      notification.classList.remove('active'); }, 3000); } async function updateWorkingHours(event)
+      { event.preventDefault(); const startTime = document.getElementById('start-time').value; const
+      endTime = document.getElementById('end-time').value; try { const response = await
+      fetch('/api/users', { method: 'PUT', headers: { 'Content-Type': 'application/json', }, body:
+      JSON.stringify({ id: userId, settings: { timezone: '{{preferences.timezone}}', workingHours: {
+      start: startTime, end: endTime, }, }, }), }); if (response.ok) {
+      document.getElementById('working-hours-display').textContent = `${startTime} - ${endTime}`;
+      closeWorkingHoursModal(); showNotification('Working hours updated successfully!'); } else {
+      throw new Error('Failed to update working hours'); } } catch (error) { console.error('Error
+      updating working hours:', error); showNotification('Failed to update working hours. Please try
+      again.', 'error'); } } async function addInbox(event) { event.preventDefault(); const name =
+      document.getElementById('inbox-name').value; const inboxId =
+      document.getElementById('inbox-id').value; const persona =
+      document.getElementById('inbox-persona').value; try { const response = await
+      fetch('/api/inboxes', { method: 'POST', headers: { 'Content-Type': 'application/json', },
+      body: JSON.stringify({ inboxId: inboxId, user: userId, name: name, persona: persona, }), });
+      if (response.ok) { showNotification('Inbox created successfully! Refreshing...');
+      setTimeout(() => { window.location.href = `/dashboard?email=${encodeURIComponent(userEmail)}`;
+      }, 1000); } else { throw new Error('Failed to create inbox'); } } catch (error) {
+      console.error('Error creating inbox:', error); showNotification('Failed to create inbox.
+      Please try again.', 'error'); } } async function deleteInbox(inboxId, inboxName) { if
+      (!confirm(`Are you sure you want to delete "${inboxName}"?`)) { return; } try { const response
+      = await fetch(`/api/inboxes/${inboxId}`, { method: 'DELETE', }); if (response.ok) { const
+      inboxCard = document.querySelector(`[data-inbox-id="${inboxId}"]`); if (inboxCard) {
+      inboxCard.remove(); } const inboxGrid = document.getElementById('inbox-grid'); const
+      remainingInboxes = inboxGrid?.querySelectorAll('.inbox-card').length || 0;
+      document.getElementById('inbox-count').textContent = remainingInboxes; if (remainingInboxes
+      === 0 && inboxGrid) { inboxGrid.innerHTML = ` <div class='empty-state'> <div
+      class='empty-state-icon'>📭</div> <p>No inboxes found. Create your first inbox to get
+      started!</p> </div> `; } showNotification('Inbox deleted successfully!'); } else { throw new
+      Error('Failed to delete inbox'); } } catch (error) { console.error('Error deleting inbox:',
+      error); showNotification('Failed to delete inbox. Please try again.', 'error'); } }
+      document.getElementById('working-hours-modal').addEventListener('click', (e) => { if
+      (e.target.id === 'working-hours-modal') { closeWorkingHoursModal(); } });
+      document.getElementById('add-inbox-modal').addEventListener('click', (e) => { if (e.target.id
+      === 'add-inbox-modal') { closeAddInboxModal(); } });
+    </script>
+  </body>
+</html>
