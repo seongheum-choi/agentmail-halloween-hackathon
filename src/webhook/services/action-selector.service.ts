@@ -26,12 +26,26 @@ export class ActionSelectorService {
     subject: string,
     text: string,
     context: EmailContext = EmailContext.INITIAL,
+    threadContext: any = null,
   ): Promise<ActionSelectionResult> {
     this.logger.log(`Selecting action for email: ${subject} (context: ${context})`);
 
     try {
       const systemMessage = this.buildSystemMessage(context);
-      const userMessage = `Subject: ${subject}\n\nBody: ${text}`;
+      let userMessage = `Subject: ${subject}\n\nBody: ${text}`;
+
+      if (threadContext && threadContext.messages && threadContext.messages.length > 0) {
+        const threadHistory = threadContext.messages
+          .map((msg: any, idx: number) => {
+            const from = msg.from || 'Unknown';
+            const timestamp = msg.timestamp || msg.createdAt || 'Unknown time';
+            const msgText = msg.text || msg.body || '';
+            return `[${idx + 1}] From: ${from} | Time: ${timestamp}\n${msgText}`;
+          })
+          .join('\n\n---\n\n');
+
+        userMessage = `Thread History (${threadContext.messages.length} messages):\n\n${threadHistory}\n\n---\n\nCurrent Email:\nSubject: ${subject}\n\nBody: ${text}`;
+      }
 
       const result = await this.chatGPTService.sendMessageWithFormat(
         userMessage,
