@@ -1,11 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ChatGPTService } from '../../agent/services/chatgpt.service';
+import { z } from 'zod';
 
-export interface ClassificationResult {
-  labels: string[];
-  isSpam: boolean;
-  isReservation: boolean;
-}
+const ClassificationResultSchema = z.object({
+  labels: z.array(z.string()),
+  isSpam: z.boolean(),
+  isReservation: z.boolean(),
+});
+
+export type ClassificationResult = z.infer<typeof ClassificationResultSchema>;
 
 @Injectable()
 export class EmailClassifierService {
@@ -36,14 +39,15 @@ Examples:
 
       const userMessage = `Subject: ${subject}\n\nBody: ${text.substring(0, 1000)}`;
 
-      const response = await this.chatGPTService.sendMessage(
+      const result = await this.chatGPTService.sendMessageWithFormat(
         userMessage,
+        ClassificationResultSchema,
+        'EmailClassification',
         [systemMessage],
         0.3,
         100,
       );
 
-      const result = JSON.parse(response) as ClassificationResult;
       this.logger.log(`Classification result: ${JSON.stringify(result)}`);
 
       return result;

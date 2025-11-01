@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
+import { z } from 'zod';
+import { zodResponseFormat } from 'openai/helpers/zod';
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -57,6 +59,51 @@ export class ChatGPTService {
       throw new Error('Unexpected response type from ChatGPT API');
     } catch (error) {
       this.logger.error(`Error calling ChatGPT API: ${error.message}`);
+      throw error;
+    }
+  }
+
+  async sendMessageWithFormat<T extends z.ZodType>(
+    message: string,
+    zodSchema: T,
+    schemaName: string,
+    conversationHistory?: Message[],
+    temperature?: number,
+    maxTokens?: number,
+  ): Promise<z.infer<T>> {
+    try {
+      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+        ...(conversationHistory || []).map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+        {
+          role: 'user' as const,
+          content: message,
+        },
+      ];
+
+      this.logger.debug(`Sending structured message to ChatGPT API with ${messages.length} messages`);
+
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        max_tokens: maxTokens || 4096,
+        temperature: temperature ?? 0.7,
+        messages,
+        response_format: zodResponseFormat(zodSchema, schemaName),
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error('No response from ChatGPT API');
+      }
+
+      // Parse and validate the JSON response against the schema
+      const parsed = JSON.parse(content);
+      const validated = zodSchema.parse(parsed);
+      return validated;
+    } catch (error) {
+      this.logger.error(`Error calling ChatGPT API with structured output: ${error.message}`);
       throw error;
     }
   }
