@@ -42,9 +42,13 @@ export class WebhookService {
     try {
       this.logger.log(`Fetching thread context for thread_id: ${message.thread_id}`);
       threadContext = await this.agentMailService.getThread(message.thread_id);
-      this.logger.log(`Thread context fetched successfully with ${threadContext.messages?.length || 0} messages`);
+      this.logger.log(
+        `Thread context fetched successfully with ${threadContext.messages?.length || 0} messages`,
+      );
     } catch (error) {
-      this.logger.warn(`Failed to fetch thread context: ${error.message}. Continuing without context.`);
+      this.logger.warn(
+        `Failed to fetch thread context: ${error.message}. Continuing without context.`,
+      );
     }
 
     const classification = await this.emailClassifierService.classifyEmail(
@@ -79,7 +83,10 @@ export class WebhookService {
   }
 
   // Use this for testing webhook
-  private async handleReservation(message: EnrichedMessage, threadContext: any = null): Promise<void> {
+  private async handleReservation(
+    message: EnrichedMessage,
+    threadContext: any = null,
+  ): Promise<void> {
     this.logger.log('=== RESERVATION DETECTED ===');
     this.logger.log(`Enriched Message: ${JSON.stringify(message, null, 2)}`);
 
@@ -231,7 +238,7 @@ export class WebhookService {
       const emailText = await this.emailResponseGeneratorService.generateEmail({
         action: EmailAction.CONFIRM,
         context: {
-          confirmedTimeSlot: actionResult.timeSuggestion!,
+          confirmedTimeSlot: actionResult.timeSuggestions ? actionResult.timeSuggestions[0] : null,
         },
         recipientName: message.from.split('@')[0],
         senderName: 'AgentMail AI',
@@ -252,7 +259,7 @@ export class WebhookService {
     // Handle CHECK_TIME action
     if (actionResult.action === EmailAction.CHECK_TIME) {
       const checkTimeAvailableAt = this.schedulerService.isTimeSlotAvailable(
-        actionResult.timeSuggestion!,
+        actionResult.timeSuggestions ? actionResult.timeSuggestions[0] : null,
         `sandbox:${targetUser.email}`, // TODO: Get user ID from message or context as needed
       );
 
@@ -267,7 +274,9 @@ export class WebhookService {
         const emailText = await this.emailResponseGeneratorService.generateEmail({
           action: EmailAction.CONFIRM,
           context: {
-            confirmedTimeSlot: actionResult.timeSuggestion!,
+            confirmedTimeSlot: actionResult.timeSuggestions
+              ? actionResult.timeSuggestions[0]
+              : null,
           },
           recipientName: message.from.split('@')[0],
           senderName: 'AgentMail AI',
@@ -298,7 +307,7 @@ export class WebhookService {
         const emailText = await this.emailResponseGeneratorService.generateEmail({
           action: EmailAction.COUNTEROFFER,
           context: {
-            proposedTimeSlot: actionResult.timeSuggestion!,
+            proposedTimeSlot: actionResult.timeSuggestions ? actionResult.timeSuggestions[0] : null,
             alternativeTimeSlots: availableSlots,
           },
           recipientName: message.from.split('@')[0],
