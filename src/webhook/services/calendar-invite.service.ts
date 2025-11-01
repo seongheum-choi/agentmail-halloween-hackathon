@@ -22,7 +22,7 @@ export class CalendarInviteService {
   private readonly logger = new Logger(CalendarInviteService.name);
 
   generateICS(eventDetails: CalendarEventDetails): string {
-    this.logger.log(`Generating ICS for event: ${eventDetails.summary}`);
+    this.logger.log(`Generating ICS for event: ${eventDetails}`);
 
     const cal = new ical.ICalCalendar({
       name: 'AgentMail AI',

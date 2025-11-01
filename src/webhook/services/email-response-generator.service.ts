@@ -5,8 +5,15 @@ import {
   OfferEmailContext,
   ConfirmEmailContext,
   CounterOfferEmailContext,
+  CheckTimeEmailContext,
 } from '../types/action.types';
 import { ChatGPTService } from '../../agent/services/chatgpt.service';
+import { z } from 'zod';
+
+const EmailResponseSchema = z.object({
+  subject: z.string().describe('The email subject line'),
+  emailContent: z.string().describe('The email body content'),
+});
 
 @Injectable()
 export class EmailResponseGeneratorService {
@@ -19,7 +26,7 @@ export class EmailResponseGeneratorService {
     threadContext: any = null,
     inboxPersona?: string,
     inboxName?: string,
-  ): Promise<string> {
+  ): Promise<{ emailContent: string; subject: string }> {
     this.logger.log(`Generating email for action: ${request.action}`);
 
     switch (request.action) {
@@ -53,6 +60,14 @@ export class EmailResponseGeneratorService {
           inboxPersona,
           inboxName,
         );
+      case EmailAction.CHECK_TIME:
+        return this.generateCheckTimeEmail(
+          request.context as CheckTimeEmailContext,
+          request.recipientName,
+          request.senderName,
+          request.meetingPurpose,
+          threadContext,
+        );
       default:
         throw new Error(`Unsupported action: ${request.action}`);
     }
@@ -66,7 +81,7 @@ export class EmailResponseGeneratorService {
     threadContext: any = null,
     inboxPersona?: string,
     inboxName?: string,
-  ): Promise<string> {
+  ): Promise<{ emailContent: string; subject: string }> {
     const timeSlots = context.availableTimeSlots
       .map((slot, index) => {
         const formattedDate = this.formatDateForEmail(slot.date);
@@ -96,9 +111,10 @@ Rules:
 - Keep the tone warm but professional
 - DO NOT use any special formatting like bold (**text**) or markdown
 - If thread history is provided, reference the conversation context naturally${personaContext}`,
+- Create a concise and professional subject line based on the meeting purpose`,
     };
 
-    let userMessage = `Generate an email with the following information:
+    let userMessage = `Generate an email with subject and body for the following information:
 
 Action: Offer meeting time slots
 ${recipientName ? `Recipient Name: ${recipientName}` : 'Recipient: (no specific name)'}
@@ -108,7 +124,9 @@ ${meetingPurpose ? `Meeting Purpose: ${meetingPurpose}` : 'Meeting Purpose: (not
 Available Time Slots:
 ${timeSlots}
 
-Generate a complete email body that offers these time slots professionally.`;
+Generate a complete email with:
+1. A concise subject line (e.g., "Meeting Time Slots - [Purpose]" or "Re: [Previous Subject]" if in a thread)
+2. A professional email body that offers these time slots`;
 
     if (threadContext && threadContext.messages && threadContext.messages.length > 0) {
       const threadHistory = threadContext.messages
@@ -124,16 +142,20 @@ Generate a complete email body that offers these time slots professionally.`;
     }
 
     try {
-      const emailContent = await this.chatGPTService.sendMessage(
+      const response = await this.chatGPTService.sendMessageWithFormat(
         userMessage,
+        EmailResponseSchema,
+        'email_response',
         [systemMessage],
         0.7,
         1000,
       );
-      return emailContent;
+      return {
+        subject: response.subject,
+        emailContent: response.emailContent,
+      };
     } catch (error) {
       this.logger.error(`Error generating offer email with AI: ${error.message}`);
-      // Fallback to simple template
       return this.generateSimpleOfferEmail(context, recipientName, senderName, meetingPurpose);
     }
   }
@@ -143,7 +165,7 @@ Generate a complete email body that offers these time slots professionally.`;
     recipientName?: string,
     senderName?: string,
     meetingPurpose?: string,
-  ): string {
+  ): { subject: string; emailContent: string } {
     const greeting = recipientName ? `Dear ${recipientName},` : 'Hello,';
     const purposeLine = meetingPurpose ? `regarding ${meetingPurpose}` : 'to discuss further';
 
@@ -157,7 +179,11 @@ Generate a complete email body that offers these time slots professionally.`;
 
     const signature = senderName ? `\n\nBest regards,\n${senderName}` : '';
 
-    return `${greeting}
+    const subject = meetingPurpose
+      ? `Meeting Time Slots - ${meetingPurpose}`
+      : 'Meeting Time Slots Available';
+
+    const emailContent = `${greeting}
 
 Thank you for your interest in scheduling a meeting ${purposeLine}.
 
@@ -168,6 +194,8 @@ ${timeSlots}
 Please let me know which time works best for you, or feel free to suggest an alternative if none of these options are suitable.
 
 I look forward to hearing from you.${signature}`;
+
+    return { subject, emailContent };
   }
 
   private async generateConfirmEmail(
@@ -178,7 +206,7 @@ I look forward to hearing from you.${signature}`;
     threadContext: any = null,
     inboxPersona?: string,
     inboxName?: string,
-  ): Promise<string> {
+  ): Promise<{ subject: string; emailContent: string }> {
     const formattedDate = this.formatDateForEmail(context.confirmedTimeSlot.date);
     const timeRange = `${context.confirmedTimeSlot.startTime} - ${context.confirmedTimeSlot.endTime}`;
 
@@ -204,9 +232,10 @@ Rules:
 - Keep the tone warm but professional
 - DO NOT use any special formatting like bold (**text**) or markdown
 - If thread history is provided, reference the conversation context naturally${personaContext}`,
+- Create a concise and professional subject line for the confirmation`,
     };
 
-    let userMessage = `Generate an email with the following information:
+    let userMessage = `Generate an email with subject and body for the following information:
 
 Action: Confirm meeting time
 ${recipientName ? `Recipient Name: ${recipientName}` : 'Recipient: (no specific name)'}
@@ -217,7 +246,9 @@ Confirmed Meeting Time:
 Date: ${formattedDate}
 Time: ${timeRange}
 
-Generate a complete email body that confirms this meeting professionally.`;
+Generate a complete email with:
+1. A concise subject line (e.g., "Meeting Confirmed - [Purpose]" or "Re: [Previous Subject]" if in a thread)
+2. A professional email body that confirms this meeting`;
 
     if (threadContext && threadContext.messages && threadContext.messages.length > 0) {
       const threadHistory = threadContext.messages
@@ -233,16 +264,20 @@ Generate a complete email body that confirms this meeting professionally.`;
     }
 
     try {
-      const emailContent = await this.chatGPTService.sendMessage(
+      const response = await this.chatGPTService.sendMessageWithFormat(
         userMessage,
+        EmailResponseSchema,
+        'email_response',
         [systemMessage],
         0.7,
         1000,
       );
-      return emailContent;
+      return {
+        subject: response.subject,
+        emailContent: response.emailContent,
+      };
     } catch (error) {
       this.logger.error(`Error generating confirm email with AI: ${error.message}`);
-      // Fallback to simple template
       return this.generateSimpleConfirmEmail(context, recipientName, senderName, meetingPurpose);
     }
   }
@@ -252,7 +287,7 @@ Generate a complete email body that confirms this meeting professionally.`;
     recipientName?: string,
     senderName?: string,
     meetingPurpose?: string,
-  ): string {
+  ): { subject: string; emailContent: string } {
     const greeting = recipientName ? `Dear ${recipientName},` : 'Hello,';
     const purposeLine = meetingPurpose ? ` ${meetingPurpose}` : '';
 
@@ -261,7 +296,9 @@ Generate a complete email body that confirms this meeting professionally.`;
 
     const signature = senderName ? `\n\nBest regards,\n${senderName}` : '';
 
-    return `${greeting}
+    const subject = meetingPurpose ? `Meeting Confirmed - ${meetingPurpose}` : 'Meeting Confirmed';
+
+    const emailContent = `${greeting}
 
 Thank you for confirming the meeting${purposeLine}.
 
@@ -271,6 +308,8 @@ Date: ${formattedDate}
 Time: ${timeRange}
 
 I look forward to meeting with you. If you need to make any changes, please don't hesitate to let me know.${signature}`;
+
+    return { subject, emailContent };
   }
 
   private async generateCounterOfferEmail(
@@ -281,7 +320,7 @@ I look forward to meeting with you. If you need to make any changes, please don'
     threadContext: any = null,
     inboxPersona?: string,
     inboxName?: string,
-  ): Promise<string> {
+  ): Promise<{ subject: string; emailContent: string }> {
     const proposedDate = this.formatDateForEmail(context.proposedTimeSlot.date);
     const proposedTime = `${context.proposedTimeSlot.startTime} - ${context.proposedTimeSlot.endTime}`;
 
@@ -316,9 +355,10 @@ Rules:
 - Keep the tone warm, apologetic but professional
 - DO NOT use any special formatting like bold (**text**) or markdown
 - If thread history is provided, reference the conversation context naturally${personaContext}`,
+- Create a concise and professional subject line for the counter-offer`,
     };
 
-    let userMessage = `Generate an email with the following information:
+    let userMessage = `Generate an email with subject and body for the following information:
 
 Action: Counter-offer with alternative meeting times
 ${recipientName ? `Recipient Name: ${recipientName}` : 'Recipient: (no specific name)'}
@@ -332,7 +372,9 @@ Time: ${proposedTime}
 Alternative Time Slots:
 ${alternativeSlots}
 
-Generate a complete email body that politely declines the original time and proposes these alternatives professionally.`;
+Generate a complete email with:
+1. A concise subject line (e.g., "Alternative Meeting Times - [Purpose]" or "Re: [Previous Subject]" if in a thread)
+2. A professional email body that politely declines the original time and proposes these alternatives`;
 
     if (threadContext && threadContext.messages && threadContext.messages.length > 0) {
       const threadHistory = threadContext.messages
@@ -348,16 +390,20 @@ Generate a complete email body that politely declines the original time and prop
     }
 
     try {
-      const emailContent = await this.chatGPTService.sendMessage(
+      const response = await this.chatGPTService.sendMessageWithFormat(
         userMessage,
+        EmailResponseSchema,
+        'email_response',
         [systemMessage],
         0.7,
         1000,
       );
-      return emailContent;
+      return {
+        subject: response.subject,
+        emailContent: response.emailContent,
+      };
     } catch (error) {
       this.logger.error(`Error generating counter-offer email with AI: ${error.message}`);
-      // Fallback to simple template
       return this.generateSimpleCounterOfferEmail(
         context,
         recipientName,
@@ -372,7 +418,7 @@ Generate a complete email body that politely declines the original time and prop
     recipientName?: string,
     senderName?: string,
     meetingPurpose?: string,
-  ): string {
+  ): { subject: string; emailContent: string } {
     const greeting = recipientName ? `Dear ${recipientName},` : 'Hello,';
     const purposeLine = meetingPurpose ? ` regarding ${meetingPurpose}` : '';
 
@@ -389,7 +435,11 @@ Generate a complete email body that politely declines the original time and prop
 
     const signature = senderName ? `\n\nBest regards,\n${senderName}` : '';
 
-    return `${greeting}
+    const subject = meetingPurpose
+      ? `Alternative Meeting Times - ${meetingPurpose}`
+      : 'Alternative Meeting Times';
+
+    const emailContent = `${greeting}
 
 Thank you for your message${purposeLine}.
 
@@ -400,6 +450,8 @@ ${alternativeSlots}
 Please let me know if any of these times work for you, or feel free to suggest another time that fits your schedule.
 
 I look forward to finding a suitable time for our meeting.${signature}`;
+
+    return { subject, emailContent };
   }
 
   private formatDateForEmail(dateString: string): string {
@@ -416,5 +468,103 @@ I look forward to finding a suitable time for our meeting.${signature}`;
       this.logger.warn(`Failed to format date: ${dateString}`);
       return dateString;
     }
+  }
+
+  private async generateCheckTimeEmail(
+    context: CheckTimeEmailContext,
+    recipientName?: string,
+    senderName?: string,
+    meetingPurpose?: string,
+    threadContext: any = null,
+  ): Promise<{ subject: string; emailContent: string }> {
+    const systemMessage = {
+      role: 'system' as const,
+      content: `You are a professional email assistant. Generate a polite and professional email to check if a meeting time is available.
+
+Rules:
+- Use appropriate greeting based on recipient name (formal if name provided, casual if not)
+- Be professional and courteous
+- Clearly check if the meeting time is available
+- Include appropriate closing and signature if sender name is provided
+- Keep the tone warm but professional
+- DO NOT use any special formatting like bold (**text**) or markdown
+- If thread history is provided, reference the conversation context naturally
+- Create a concise and professional subject line for the check time`,
+    };
+
+    let userMessage = `Generate an email with subject and body for the following information:
+
+Action: Check meeting time
+${recipientName ? `Recipient Name: ${recipientName}` : 'Recipient: (no specific name)'}
+${senderName ? `Sender Name: ${senderName}` : 'Sender: (no specific name)'}
+${meetingPurpose ? `Meeting Purpose: ${meetingPurpose}` : 'Meeting Purpose: (not specified)'}
+
+Time to Check:
+Date: ${context.timeSuggestions[0].date}
+Time: ${context.timeSuggestions[0].startTime} - ${context.timeSuggestions[0].endTime}
+
+Generate a complete email with:
+1. A concise subject line (e.g., "Check Meeting Time - [Purpose]" or "Re: [Previous Subject]" if in a thread)
+2. A professional email body that checks if the meeting time is available`;
+
+    if (threadContext && threadContext.messages && threadContext.messages.length > 0) {
+      const threadHistory = threadContext.messages
+        .map((msg: any, idx: number) => {
+          const from = msg.from || 'Unknown';
+          const timestamp = msg.timestamp || msg.createdAt || 'Unknown time';
+          const msgText = msg.text || msg.body || '';
+          return `[${idx + 1}] From: ${from} | Time: ${timestamp}\n${msgText}`;
+        })
+        .join('\n\n---\n\n');
+
+      userMessage = `Thread History (${threadContext.messages.length} messages):\n\n${threadHistory}\n\n---\n\n${userMessage}`;
+    }
+
+    try {
+      const response = await this.chatGPTService.sendMessageWithFormat(
+        userMessage,
+        EmailResponseSchema,
+        'email_response',
+        [systemMessage],
+        0.7,
+        1000,
+      );
+      return {
+        subject: response.subject,
+        emailContent: response.emailContent,
+      };
+    } catch (error) {
+      this.logger.error(`Error generating check time email with AI: ${error.message}`);
+      return this.generateSimpleCheckTimeEmail(context, recipientName, senderName, meetingPurpose);
+    }
+  }
+
+  private generateSimpleCheckTimeEmail(
+    context: CheckTimeEmailContext,
+    recipientName?: string,
+    senderName?: string,
+    meetingPurpose?: string,
+  ): { subject: string; emailContent: string } {
+    const greeting = recipientName ? `Dear ${recipientName},` : 'Hello,';
+    const purposeLine = meetingPurpose ? ` regarding ${meetingPurpose}` : '';
+
+    const formattedDate = this.formatDateForEmail(context.timeSuggestions[0].date);
+    const timeRange = `${context.timeSuggestions[0].startTime} - ${context.timeSuggestions[0].endTime}`;
+
+    const signature = senderName ? `\n\nBest regards,\n${senderName}` : '';
+
+    const subject = meetingPurpose
+      ? `Check Meeting Time - ${meetingPurpose}`
+      : 'Check Meeting Time';
+
+    const emailContent = `${greeting}
+
+Thank you for your message${purposeLine}.
+
+I am checking if the meeting time is available on ${formattedDate} at ${timeRange}.
+
+I look forward to hearing from you.${signature}`;
+
+    return { subject, emailContent };
   }
 }

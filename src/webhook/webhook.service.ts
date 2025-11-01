@@ -35,6 +35,12 @@ export class WebhookService {
     private readonly chatGPTService: ChatGPTService,
   ) {}
 
+  private formatMeetingTitle(purpose: string, date: string, time: string): string {
+    const dateObj = new Date(date);
+    const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+    return `${purpose} at ${time} ${dayOfWeek}`;
+  }
+
   async handleWebhook(payload: WebhookPayloadDto): Promise<void> {
     this.logger.log(`Received webhook: ${payload.event_type}`);
 
@@ -127,11 +133,9 @@ export class WebhookService {
           throw new Error(`Unsupported action: ${actionResult.action}`);
       }
     })();
-
-    // Get inbox information for persona
+      
     const inbox = await this.inboxRepository.getByInboxId({ inboxId: message.inboxId });
-
-    const emailContentToSend = await this.emailResponseGeneratorService.generateEmail(
+    const { emailContent, subject } = await this.emailResponseGeneratorService.generateEmail(
       {
         action: actionResult.action,
         context,
@@ -149,7 +153,8 @@ export class WebhookService {
     await this.agentMailService.replyToMessage({
       inboxId: message.inboxId,
       messageId: message.id,
-      text: emailContentToSend,
+      text: emailContent,
+      subject: meetingTitle,
       icsContent,
       cc: null, // TODO: Fill the cc recipients from the user's profile
     });
@@ -338,9 +343,10 @@ Output: Website Redesign Kickoff`,
       await this.agentMailService.replyToMessage({
         inboxId: message.inboxId,
         messageId: message.id,
-        text: emailText,
         icsContent,
-        cc: [targetUser.email], // TODO: Get cc from user profile if needed
+        text: emailResponse.emailContent,
+        subject: emailResponse.subject,
+        cc: null, // TODO: Get cc from user profile if needed
       });
 
       this.logger.log(`Confirmation email sent to: ${message.from}`);
@@ -394,8 +400,9 @@ Output: Website Redesign Kickoff`,
         await this.agentMailService.replyToMessage({
           inboxId: message.inboxId,
           messageId: message.id,
-          text: emailText,
           icsContent,
+          text: emailResponse.emailContent,
+          subject: emailResponse.subject,
           cc: [targetUser.email],
         });
 
@@ -434,8 +441,9 @@ Output: Website Redesign Kickoff`,
         await this.agentMailService.replyToMessage({
           inboxId: message.inboxId,
           messageId: message.id,
-          text: emailText,
           cc: null,
+          text: emailResponse.emailContent,
+          subject: emailResponse.subject,
         });
       }
     } else if (actionResult.action === EmailAction.OFFER) {
@@ -470,8 +478,9 @@ Output: Website Redesign Kickoff`,
       await this.agentMailService.replyToMessage({
         inboxId: message.inboxId,
         messageId: message.id,
-        text: emailText,
         cc: null,
+        text: emailResponse.emailContent,
+        subject: emailResponse.subject,
       });
     }
 
@@ -498,9 +507,15 @@ Output: Website Redesign Kickoff`,
       const startDateTime = new Date(`${firstSlot.date}T${firstSlot.startTime}:00`);
       const endDateTime = new Date(`${firstSlot.date}T${firstSlot.endTime}:00`);
 
+      const meetingTitle = this.formatMeetingTitle(
+        message.subject,
+        firstSlot.date,
+        firstSlot.startTime,
+      );
+
       const icsContent = this.calendarInviteService.generateICS({
-        summary: message.subject,
-        description: `Meeting scheduled in response to: ${message.text.substring(0, 100)}...`,
+        summary: meetingTitle,
+        description: `Meeting scheduled in response to: ${message.text?.substring(0, 100)}...`,
         location: 'To be determined',
         startTime: startDateTime,
         endTime: endDateTime,
@@ -510,7 +525,7 @@ Output: Website Redesign Kickoff`,
         },
         attendees: [
           {
-            name: message.from.split('@')[0],
+            name: message.from?.split('@')[0],
             email: message.from,
           },
         ],
@@ -542,6 +557,7 @@ AgentMail AI`;
         inboxId: message.inboxId,
         messageId: message.id,
         text: emailText,
+        subject: meetingTitle,
         icsContent,
         cc: null, // TODO: Fill the cc recipients from the user's profile
       });
