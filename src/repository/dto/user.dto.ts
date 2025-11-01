@@ -35,7 +35,7 @@ export const UpdateUserRequestSchema = z.object({
   id: z.string(),
   email: z.string().email().optional(),
   name: z.string().optional(),
-  settings: PreferencesSchema.optional(),
+  preferences: PreferencesSchema.optional(),
   integrations: IntegrationsSchema.optional(),
 });
 

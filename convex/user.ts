@@ -55,7 +55,7 @@ export const update = mutation({
     id: v.id('users'),
     email: v.optional(v.string()),
     name: v.optional(v.string()),
-    settings: v.optional(
+    preferences: v.optional(
       v.object({
         timezone: v.string(),
         workingHours: v.object({
@@ -71,8 +71,25 @@ export const update = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const { id, ...updates } = args;
-    await ctx.db.patch(id, updates);
+    const { id, preferences, email, name, integrations } = args;
+
+    // First, get the current user to replace it entirely
+    const currentUser: any = await ctx.db.get(id);
+    if (!currentUser) {
+      throw new Error('User not found');
+    }
+
+    // Build the updated user object, ensuring we only include valid fields
+    // Use preferences from currentUser (not preferences) as the base
+    const updatedUser = {
+      email: email !== undefined ? email : currentUser.email,
+      name: name !== undefined ? name : currentUser.name,
+      preferences: preferences !== undefined ? preferences : currentUser.preferences,
+      integrations: integrations !== undefined ? integrations : currentUser.integrations,
+    };
+
+    // Replace the document entirely to remove any invalid fields like 'preferences'
+    await ctx.db.replace(id, updatedUser);
     return id;
   },
 });
