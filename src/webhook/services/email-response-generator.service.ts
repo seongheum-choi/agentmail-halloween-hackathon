@@ -106,9 +106,7 @@ Generate a complete email body that offers these time slots professionally.`;
     meetingPurpose?: string,
   ): string {
     const greeting = recipientName ? `Dear ${recipientName},` : 'Hello,';
-    const purposeLine = meetingPurpose
-      ? `regarding ${meetingPurpose}`
-      : 'to discuss further';
+    const purposeLine = meetingPurpose ? `regarding ${meetingPurpose}` : 'to discuss further';
 
     const timeSlots = context.availableTimeSlots
       .map((slot, index) => {
@@ -271,7 +269,12 @@ Generate a complete email body that politely declines the original time and prop
     } catch (error) {
       this.logger.error(`Error generating counter-offer email with AI: ${error.message}`);
       // Fallback to simple template
-      return this.generateSimpleCounterOfferEmail(context, recipientName, senderName, meetingPurpose);
+      return this.generateSimpleCounterOfferEmail(
+        context,
+        recipientName,
+        senderName,
+        meetingPurpose,
+      );
     }
   }
 
@@ -282,9 +285,7 @@ Generate a complete email body that politely declines the original time and prop
     meetingPurpose?: string,
   ): string {
     const greeting = recipientName ? `Dear ${recipientName},` : 'Hello,';
-    const purposeLine = meetingPurpose
-      ? ` regarding ${meetingPurpose}`
-      : '';
+    const purposeLine = meetingPurpose ? ` regarding ${meetingPurpose}` : '';
 
     const proposedDate = this.formatDateForEmail(context.proposedTimeSlot.date);
     const proposedTime = `${context.proposedTimeSlot.startTime} - ${context.proposedTimeSlot.endTime}`;
