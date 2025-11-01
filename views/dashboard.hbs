@@ -516,61 +516,7 @@
       <span id='notification-message'></span>
     </div>
 
-<<<<<<< HEAD
-<<<<<<< HEAD
     <script>
-      const userId = '{{_id}}'; const userEmail = '{{email}}'; function openWorkingHoursModal() {
-      document.getElementById('working-hours-modal').classList.add('active'); } function
-      closeWorkingHoursModal() {
-      document.getElementById('working-hours-modal').classList.remove('active'); } function
-      openAddInboxModal() { document.getElementById('add-inbox-modal').classList.add('active'); }
-      function closeAddInboxModal() {
-      document.getElementById('add-inbox-modal').classList.remove('active');
-      document.getElementById('add-inbox-form').reset(); } function showNotification(message, type =
-      'success') { const notification = document.getElementById('notification'); const messageEl =
-      document.getElementById('notification-message'); messageEl.textContent = message;
-      notification.className = `notification ${type} active`; setTimeout(() => {
-      notification.classList.remove('active'); }, 3000); } async function updateWorkingHours(event)
-      { event.preventDefault(); const startTime = document.getElementById('start-time').value; const
-      endTime = document.getElementById('end-time').value; try { const response = await
-      fetch('/api/users', { method: 'PUT', headers: { 'Content-Type': 'application/json', }, body:
-      JSON.stringify({ id: userId, settings: { timezone: '{{preferences.timezone}}', workingHours: {
-      start: startTime, end: endTime, }, }, }), }); if (response.ok) {
-      document.getElementById('working-hours-display').textContent = `${startTime} - ${endTime}`;
-      closeWorkingHoursModal(); showNotification('Working hours updated successfully!'); } else {
-      throw new Error('Failed to update working hours'); } } catch (error) { console.error('Error
-      updating working hours:', error); showNotification('Failed to update working hours. Please try
-      again.', 'error'); } } async function addInbox(event) { event.preventDefault(); const name =
-      document.getElementById('inbox-name').value; const inboxId =
-      document.getElementById('inbox-id').value; const persona =
-      document.getElementById('inbox-persona').value; try { const response = await
-      fetch('/api/inboxes', { method: 'POST', headers: { 'Content-Type': 'application/json', },
-      body: JSON.stringify({ inboxId: inboxId, user: userId, name: name, persona: persona, }), });
-      if (response.ok) { showNotification('Inbox created successfully! Refreshing...');
-      setTimeout(() => { window.location.href = `/dashboard?email=${encodeURIComponent(userEmail)}`;
-      }, 1000); } else { throw new Error('Failed to create inbox'); } } catch (error) {
-      console.error('Error creating inbox:', error); showNotification('Failed to create inbox.
-      Please try again.', 'error'); } } async function deleteInbox(inboxId, inboxName) { if
-      (!confirm(`Are you sure you want to delete "${inboxName}"?`)) { return; } try { const response
-      = await fetch(`/api/inboxes/${inboxId}`, { method: 'DELETE', }); if (response.ok) { const
-      inboxCard = document.querySelector(`[data-inbox-id="${inboxId}"]`); if (inboxCard) {
-      inboxCard.remove(); } const inboxGrid = document.getElementById('inbox-grid'); const
-      remainingInboxes = inboxGrid?.querySelectorAll('.inbox-card').length || 0;
-      document.getElementById('inbox-count').textContent = remainingInboxes; if (remainingInboxes
-      === 0 && inboxGrid) { inboxGrid.innerHTML = ` <div class='empty-state'> <div
-      class='empty-state-icon'>📭</div> <p>No inboxes found. Create your first inbox to get
-      started!</p> </div> `; } showNotification('Inbox deleted successfully!'); } else { throw new
-      Error('Failed to delete inbox'); } } catch (error) { console.error('Error deleting inbox:',
-      error); showNotification('Failed to delete inbox. Please try again.', 'error'); } }
-      document.getElementById('working-hours-modal').addEventListener('click', (e) => { if
-      (e.target.id === 'working-hours-modal') { closeWorkingHoursModal(); } });
-      document.getElementById('add-inbox-modal').addEventListener('click', (e) => { if (e.target.id
-      === 'add-inbox-modal') { closeAddInboxModal(); } });
-=======
-<script>
-=======
-    <script>
->>>>>>> 86c9be1 (Fix dashboard)
       const userId = '{{_id}}';
       const userEmail = '{{email}}';
 
@@ -721,10 +667,6 @@
           closeAddInboxModal();
         }
       });
-<<<<<<< HEAD
->>>>>>> 0214af9 ((#AGE-25) Implement user dashboard endpoint)
-=======
->>>>>>> 86c9be1 (Fix dashboard)
     </script>
   </body>
 </html>
