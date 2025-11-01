@@ -4,7 +4,7 @@ import { EmailClassifierService } from './services/email-classifier.service';
 import { ActionSelectorService } from './services/action-selector.service';
 import { SchedulerService } from './services/scheduler.service';
 import { CalendarInviteService } from './services/calendar-invite.service';
-import { EmailSenderService } from './services/email-sender.service';
+import { AgentMailService } from '../agentmail/services/agentmail.service';
 import { EmailContext } from './types/action.types';
 
 @Injectable()
@@ -16,7 +16,7 @@ export class WebhookService {
     private readonly actionSelectorService: ActionSelectorService,
     private readonly schedulerService: SchedulerService,
     private readonly calendarInviteService: CalendarInviteService,
-    private readonly emailSenderService: EmailSenderService,
+    private readonly agentMailService: AgentMailService,
   ) {}
 
   async handleWebhook(payload: WebhookPayloadDto): Promise<void> {
@@ -31,6 +31,7 @@ export class WebhookService {
 
     const enrichedMessage = {
       id: message.message_id,
+      inboxId: message.inbox_id,
       from: message.from,
       to: message.to,
       subject: message.subject,
@@ -120,10 +121,9 @@ Please find the calendar invitation attached. Looking forward to meeting with yo
 Best regards,
 AgentMail AI`;
 
-      await this.emailSenderService.sendEmailWithCalendarInvite({
-        from: message.to,
-        to: message.from,
-        subject: `Re: ${message.subject}`,
+      await this.agentMailService.replyToMessage({
+        inboxId: message.inboxId,
+        messageId: message.id,
         text: emailText,
         icsContent,
       });
