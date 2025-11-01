@@ -22,6 +22,8 @@ export class HyperspellService {
   async getUserToken(userId: string = 'anonymous'): Promise<string> {
     try {
       const response = await this.hyperspell.auth.userToken({ user_id: userId });
+
+      this.logger.debug(`Obtained Hyperspell user token for userId=${userId} is ${response.token}`);
       return response.token;
     } catch (error) {
       throw new BadRequestException(
@@ -32,12 +34,12 @@ export class HyperspellService {
 
   async search(query: string, userId: string = 'anonymous', answer: boolean = true) {
     try {
-      const hyperspell = new Hyperspell({
-        apiKey: this.configService.get<string>('HYPERSPELL_API_KEY'),
-        userID: userId,
+      const userToken = await this.getUserToken('sandbox:juungbae@gmail.com');
+      const client = new Hyperspell({
+        apiKey: userToken,
       });
 
-      const response = await hyperspell.memories.search({
+      const response = await client.memories.search({
         query,
         answer,
         sources: [
@@ -59,15 +61,15 @@ export class HyperspellService {
 
   async queryCalendar(query: string, userId: string = 'anonymous', answer: boolean = true) {
     try {
-      const hyperspell = new Hyperspell({
-        apiKey: this.configService.get<string>('HYPERSPELL_API_KEY'),
-        userID: userId,
+      const userToken = await this.getUserToken('sandbox:juungbae@gmail.com');
+      const client = new Hyperspell({
+        apiKey: userToken,
       });
 
-      const response = await hyperspell.memories.search({
+      const response = await client.memories.search({
         query,
         answer,
-        sources: ['google_calendar'],
+        sources: ['google_calendar', 'vault'],
       });
 
       if (response.errors.length > 0) {

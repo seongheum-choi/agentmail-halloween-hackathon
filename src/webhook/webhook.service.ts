@@ -4,8 +4,10 @@ import { EmailClassifierService } from './services/email-classifier.service';
 import { ActionSelectorService } from './services/action-selector.service';
 import { SchedulerService } from './services/scheduler.service';
 import { CalendarInviteService } from './services/calendar-invite.service';
+import { EmailContext, EmailAction } from './types/action.types';
+import { HyperspellService } from '../agent/services/hyperspell.service';
 import { AgentMailService } from '../agentmail/services/agentmail.service';
-import { EmailContext } from './types/action.types';
+import { EmailResponseGeneratorService } from './services/email-response-generator.service';
 
 @Injectable()
 export class WebhookService {
@@ -14,6 +16,8 @@ export class WebhookService {
   constructor(
     private readonly emailClassifierService: EmailClassifierService,
     private readonly actionSelectorService: ActionSelectorService,
+    private readonly hyperspellService: HyperspellService,
+    private readonly emailResponseGeneratorService: EmailResponseGeneratorService,
     private readonly schedulerService: SchedulerService,
     private readonly calendarInviteService: CalendarInviteService,
     private readonly agentMailService: AgentMailService,
@@ -42,9 +46,7 @@ export class WebhookService {
       isReservation: classification.isReservation,
     };
 
-    this.logger.log(
-      `Email classified - Labels: ${classification.labels.join(', ')}`,
-    );
+    this.logger.log(`Email classified - Labels: ${classification.labels.join(', ')}`);
 
     if (!classification.isSpam && classification.isReservation) {
       await this.handleReservation(enrichedMessage);
@@ -65,11 +67,17 @@ export class WebhookService {
     this.logger.log(`Confidence: ${actionResult.confidence}`);
     this.logger.log(`Reasoning: ${actionResult.reasoning}`);
 
-    console.log(JSON.stringify({
-      action: actionResult.action,
-      confidence: actionResult.confidence,
-      reasoning: actionResult.reasoning,
-    }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          action: actionResult.action,
+          confidence: actionResult.confidence,
+          reasoning: actionResult.reasoning,
+        },
+        null,
+        2,
+      ),
+    );
 
     const availableSlots = await this.schedulerService.findAvailableSlots(
       {
@@ -114,7 +122,14 @@ I would like to schedule a meeting with you. Based on my availability, I propose
 Date: ${firstSlot.date}
 Time: ${firstSlot.startTime} - ${firstSlot.endTime}
 
-${availableSlots.length > 1 ? `Alternative time slots:\n${availableSlots.slice(1).map((slot, idx) => `${idx + 2}. ${slot.date} at ${slot.startTime} - ${slot.endTime}`).join('\n')}` : ''}
+${
+  availableSlots.length > 1
+    ? `Alternative time slots:\n${availableSlots
+        .slice(1)
+        .map((slot, idx) => `${idx + 2}. ${slot.date} at ${slot.startTime} - ${slot.endTime}`)
+        .join('\n')}`
+    : ''
+}
 
 Please find the calendar invitation attached. Looking forward to meeting with you.
 
@@ -132,5 +147,97 @@ AgentMail AI`;
     }
 
     this.logger.log('============================');
+
+    if (actionResult.action === 'CONFIRM') {
+      return;
+    }
+
+    if (actionResult.action === 'CHECK_TIME') {
+      const query = `IS THERE ANY SCHEDULE at ${actionResult.time_schedule}?`;
+      this.logger.log(`Querying calendar: ${query}`);
+
+      const calendarResult = await this.hyperspellService.queryCalendar(query);
+
+      this.logger.log('Calendar Query Result:');
+      this.logger.log(`Answer: ${calendarResult.answer}`);
+
+      if (calendarResult.documents.length > 0) {
+        this.logger.log(`Found ${calendarResult.documents.length} relevant calendar events`);
+      }
+
+      // Create response based on calendarResult.answer
+      const nextActionResult = await this.actionSelectorService.selectAction(
+        message.subject,
+        message.text + '\n\nCalendar Availability: ' + calendarResult.answer,
+        EmailContext.AFTER_CHECK_TIME,
+      );
+
+      this.logger.log(`Next Selected Action: ${nextActionResult.action}`);
+      this.logger.log(`Confidence: ${nextActionResult.confidence}`);
+      this.logger.log(`Reasoning: ${nextActionResult.reasoning}`);
+
+      console.log(
+        JSON.stringify(
+          {
+            action: nextActionResult.action,
+            confidence: nextActionResult.confidence,
+            reasoning: nextActionResult.reasoning,
+          },
+          null,
+          2,
+        ),
+      );
+
+      if (nextActionResult.action === 'CONFIRM') {
+        this.logger.log('Reservation can be confirmed based on calendar availability.');
+        await this.sendConfirmationEmail(message, actionResult.time_schedule);
+      }
+    }
+  }
+
+  private async sendConfirmationEmail(message: any, timeSchedule: string): Promise<void> {
+    try {
+      this.logger.log('Generating confirmation email response');
+
+      // Generate email response
+      const emailResponse = this.emailResponseGeneratorService.generateEmail({
+        action: EmailAction.CONFIRM,
+        context: {
+          confirmedTimeSlot: {
+            date: timeSchedule.split(' ')[0],
+            startTime: timeSchedule.split(' ')[1],
+            endTime: timeSchedule.split(' ')[1],
+          },
+        },
+        recipientName: message.from.split('@')[0],
+        senderName: 'AgentMail Assistant',
+        meetingPurpose: message.subject,
+      });
+
+      this.logger.log('Sending confirmation email via AgentMail');
+
+      // Send email via AgentMail
+      const inboxes = await this.agentMailService.listInboxes();
+      if (inboxes.length === 0) {
+        this.logger.error('No inboxes available to send from');
+        return;
+      }
+
+      // FIXME: bug caused.
+      const inboxId = inboxes[0].id;
+      this.logger.log(`Sending from inbox: ${inboxId}`);
+
+      await this.agentMailService.sendResponse('halloween-test@agentmail.to', {
+        to: message.from,
+        subject: `Re: ${message.subject}`,
+        text: emailResponse,
+        labels: ['reservation', 'confirmed'],
+      });
+
+      this.logger.log('Confirmation email sent successfully');
+    } catch (error) {
+      this.logger.error('Failed to send confirmation email', error);
+      throw error;
+    }
   }
 }

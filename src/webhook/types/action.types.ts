@@ -14,6 +14,7 @@ export interface ActionSelectionResult {
   action: EmailAction;
   confidence: number;
   reasoning: string;
+  time_schedule?: string;
 }
 
 // Email generation context types

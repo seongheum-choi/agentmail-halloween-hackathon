@@ -7,6 +7,7 @@ const ActionSelectionSchema = z.object({
   action: z.enum(['OFFER', 'CHECK_TIME', 'CONFIRM', 'COUNTEROFFER']),
   confidence: z.number().min(0).max(1),
   reasoning: z.string(),
+  time_schedule: z.string().nullable().optional(),
 });
 
 @Injectable()
@@ -41,6 +42,7 @@ export class ActionSelectorService {
         action: result.action as EmailAction,
         confidence: result.confidence,
         reasoning: result.reasoning,
+        time_schedule: result.time_schedule ?? undefined,
       };
     } catch (error) {
       this.logger.error(`Error selecting action: ${error.message}`);
@@ -81,7 +83,8 @@ For INITIAL emails (first contact), you can select from these actions:
 
 Respond with a JSON object containing:
 - action: One of ["OFFER", "CHECK_TIME", "CONFIRM"]
-- reasoning: Brief explanation of why you selected this action`,
+- reasoning: Brief explanation of why you selected this action
+- time_schedule: If action is CHECK_TIME, include proposed time details in this format: YYYY-MM-DD HH:MM (24-hour format)`,
       };
     } else {
       return {
@@ -91,7 +94,7 @@ Respond with a JSON object containing:
 With time context, you can select from these actions:
 
 1. CONFIRM - Use when:
-   - You can confirm the proposed time.
+   - You can confirm the proposed time.  If no information, it can be confirmed.
 
 2. COUNTEROFFER - Use when:
    - You cannot confirm the proposed time and need to suggest an alternative.

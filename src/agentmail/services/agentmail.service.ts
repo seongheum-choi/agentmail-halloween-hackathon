@@ -17,6 +17,35 @@ export class AgentMailService {
     this.logger.log('AgentMail client initialized');
   }
 
+  async sendResponse(
+    inboxId: string,
+    messageData: {
+      to: string;
+      subject: string;
+      text: string;
+      html?: string;
+      labels?: string[];
+    },
+  ) {
+    try {
+      this.logger.log(`Sending message from inbox ${inboxId} to ${messageData.to}`);
+
+      const sentMessage = await this.client.inboxes.messages.send(inboxId, {
+        to: messageData.to,
+        subject: messageData.subject,
+        text: messageData.text,
+        html: messageData.html,
+        labels: messageData.labels || [],
+      });
+
+      this.logger.log(`Message sent successfully`);
+      return sentMessage;
+    } catch (error) {
+      this.logger.error('Error sending message', error);
+      throw error;
+    }
+  }
+
   async listInboxes() {
     try {
       this.logger.log('Fetching inboxes');
