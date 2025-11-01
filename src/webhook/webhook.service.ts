@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { WebhookPayloadDto } from './dto/webhook-payload.dto';
 import { EmailClassifierService } from './services/email-classifier.service';
+import { ActionSelectorService } from './services/action-selector.service';
+import { EmailContext } from './types/action.types';
 
 @Injectable()
 export class WebhookService {
@@ -8,6 +10,7 @@ export class WebhookService {
 
   constructor(
     private readonly emailClassifierService: EmailClassifierService,
+    private readonly actionSelectorService: ActionSelectorService,
   ) {}
 
   async handleWebhook(payload: WebhookPayloadDto): Promise<void> {
@@ -37,13 +40,30 @@ export class WebhookService {
     );
 
     if (!classification.isSpam && classification.isReservation) {
-      this.handleReservation(enrichedMessage);
+      await this.handleReservation(enrichedMessage);
     }
   }
 
-  private handleReservation(message: any): void {
+  private async handleReservation(message: any): Promise<void> {
     this.logger.log('=== RESERVATION DETECTED ===');
     console.log(JSON.stringify(message, null, 2));
+
+    const actionResult = await this.actionSelectorService.selectAction(
+      message.subject,
+      message.text,
+      EmailContext.INITIAL,
+    );
+
+    this.logger.log(`Selected Action: ${actionResult.action}`);
+    this.logger.log(`Confidence: ${actionResult.confidence}`);
+    this.logger.log(`Reasoning: ${actionResult.reasoning}`);
+
+    console.log(JSON.stringify({
+      action: actionResult.action,
+      confidence: actionResult.confidence,
+      reasoning: actionResult.reasoning,
+    }, null, 2));
+
     this.logger.log('============================');
   }
 }
