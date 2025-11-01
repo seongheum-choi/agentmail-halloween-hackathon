@@ -14,7 +14,7 @@ export interface ActionSelectionResult {
   action: EmailAction;
   confidence: number;
   reasoning: string;
-  timeSuggestion?: string | null;
+  timeSuggestions?: TimeSlot[] | null;
 }
 
 // Email generation context types
@@ -37,13 +37,18 @@ export interface CounterOfferEmailContext {
   alternativeTimeSlots: TimeSlot[];
 }
 
+export interface CheckTimeEmailContext {
+  timeSuggestions?: TimeSlot[];
+}
+
 export type EmailGenerationContext =
   | OfferEmailContext
   | ConfirmEmailContext
-  | CounterOfferEmailContext;
+  | CounterOfferEmailContext
+  | CheckTimeEmailContext;
 
 export interface EmailGenerationRequest {
-  action: EmailAction.OFFER | EmailAction.CONFIRM | EmailAction.COUNTEROFFER;
+  action: EmailAction;
   context: EmailGenerationContext;
   recipientName?: string;
   senderName?: string;

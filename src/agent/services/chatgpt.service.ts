@@ -29,7 +29,12 @@ export class ChatGPTService {
     this.logger.log(`Initialized ChatGPT service with model: ${this.model}`);
   }
 
-  async sendMessage(message: string, conversationHistory?: Message[], temperature?: number, maxTokens?: number): Promise<string> {
+  async sendMessage(
+    message: string,
+    conversationHistory?: Message[],
+    temperature?: number,
+    maxTokens?: number,
+  ): Promise<string> {
     try {
       const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
         ...(conversationHistory || []).map((msg) => ({
@@ -83,7 +88,9 @@ export class ChatGPTService {
         },
       ];
 
-      this.logger.debug(`Sending structured message to ChatGPT API with ${messages.length} messages`);
+      this.logger.debug(
+        `Sending structured message to ChatGPT API with ${messages.length} messages`,
+      );
 
       const response = await this.client.chat.completions.create({
         model: this.model,

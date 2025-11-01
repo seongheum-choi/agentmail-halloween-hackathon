@@ -6,7 +6,16 @@ import { SchedulerService } from './services/scheduler.service';
 import { CalendarInviteService } from './services/calendar-invite.service';
 import { EmailResponseGeneratorService } from './services/email-response-generator.service';
 import { AgentMailService } from '../agentmail/services/agentmail.service';
-import { EmailContext, EmailAction } from './types/action.types';
+import {
+  EmailContext,
+  EmailAction,
+  EmailGenerationContext,
+  OfferEmailContext,
+  ConfirmEmailContext,
+  CounterOfferEmailContext,
+  CheckTimeEmailContext,
+} from './types/action.types';
+import { EnrichedMessage } from './types/message.types';
 
 @Injectable()
 export class WebhookService {
@@ -51,7 +60,100 @@ export class WebhookService {
     }
   }
 
-  private async handleReservation(message: any): Promise<void> {
+  async handleTestWebhook(message: any): Promise<void> {
+    // Immediately call confirm schedule
+    await this.confirmSchedule(message);
+  }
+
+  // Use this for testing webhook
+  private async handleReservation(message: EnrichedMessage): Promise<void> {
+    this.logger.log('=== RESERVATION DETECTED ===');
+    this.logger.log(`Enriched Message: ${JSON.stringify(message, null, 2)}`);
+
+    const actionResult = await this.actionSelectorService.selectAction(
+      message.subject,
+      message.text,
+      EmailContext.INITIAL,
+    );
+
+    this.logger.log(`Selected Action: ${actionResult.action}`);
+    this.logger.log(`Confidence: ${actionResult.confidence}`);
+    this.logger.log(`Reasoning: ${actionResult.reasoning}`);
+
+    const timeSuggestions = actionResult.timeSuggestions || [];
+    const context: EmailGenerationContext = (() => {
+      switch (actionResult.action) {
+        case EmailAction.OFFER:
+          return {
+            availableTimeSlots: timeSuggestions,
+          } as OfferEmailContext;
+        case EmailAction.CONFIRM:
+          return {
+            confirmedTimeSlot: timeSuggestions[0],
+          } as ConfirmEmailContext;
+        case EmailAction.COUNTEROFFER:
+          return {
+            proposedTimeSlot: timeSuggestions[0],
+            alternativeTimeSlots: timeSuggestions.slice(1),
+          } as CounterOfferEmailContext;
+        case EmailAction.CHECK_TIME:
+          return {
+            timeSuggestions: timeSuggestions,
+          } as CheckTimeEmailContext;
+        default:
+          throw new Error(`Unsupported action: ${actionResult.action}`);
+      }
+    })();
+
+    const emailContentToSend = await this.emailResponseGeneratorService.generateEmail({
+      action: actionResult.action,
+      context,
+      recipientName: message.from.split('@')[0],
+      senderName: 'AgentMail AI',
+      meetingPurpose: message.subject,
+    });
+
+    await this.agentMailService.replyToMessage({
+      inboxId: message.inboxId,
+      messageId: message.id,
+      text: emailContentToSend,
+      cc: null, // TODO: Fill the cc recipients from the user's profile
+    });
+  }
+
+  // Handle webhook with AI classification and action selection
+  async handleWebhookWithAI(payload: WebhookPayloadDto): Promise<void> {
+    this.logger.log(`Received webhook: ${payload.event_type}`);
+
+    const { message } = payload;
+
+    const classification = await this.emailClassifierService.classifyEmail(
+      message.subject,
+      message.text,
+    );
+
+    const enrichedMessage = {
+      id: message.message_id,
+      inboxId: message.inbox_id,
+      from: message.from,
+      to: message.to,
+      subject: message.subject,
+      text: message.text,
+      receivedAt: message.timestamp,
+      labels: classification.labels,
+      isSpam: classification.isSpam,
+      isReservation: classification.isReservation,
+    };
+
+    this.logger.log(`Email classified - Labels: ${classification.labels.join(', ')}`);
+
+    if (!classification.isSpam && classification.isReservation) {
+      await this.handleReservation(enrichedMessage);
+    }
+  }
+
+  // Handle reservation email with AI
+  private async handleReservationWithAI(message: any): Promise<void> {
     this.logger.log('=== RESERVATION DETECTED ===');
     console.log(JSON.stringify(message, null, 2));
 
@@ -65,18 +167,27 @@ export class WebhookService {
     this.logger.log(`Confidence: ${actionResult.confidence}`);
     this.logger.log(`Reasoning: ${actionResult.reasoning}`);
 
-    console.log(
-      JSON.stringify(
-        {
-          action: actionResult.action,
-          confidence: actionResult.confidence,
-          reasoning: actionResult.reasoning,
-        },
-        null,
-        2,
-      ),
-    );
+    const emailText = await this.emailResponseGeneratorService.generateEmail({
+      action: actionResult.action,
+      context: {},
+      recipientName: message.from.split('@')[0],
+      senderName: 'AgentMail AI',
+      meetingPurpose: message.subject,
+    });
 
+    const availableSlots = await this.schedulerService.findAvailableSlots(
+      {
+        meetingDuration: 60,
+        workingHours: {
+          start: '09:00',
+          end: '18:00',
+        },
+      },
+      'sandbox:juungbae@gmail.com', // TODO: Get user ID from message or context as needed
+    );
+  }
+
+  private async confirmSchedule(message: any) {
     const availableSlots = await this.schedulerService.findAvailableSlots(
       {
         meetingDuration: 30, // TODO: Fill the meeting duration from the message object
@@ -148,86 +259,6 @@ AgentMail AI`;
     }
 
     this.logger.log('============================');
-  }
-
-  // Handle webhook with AI classification and action selection
-  async handleWebhookWithAI(payload: WebhookPayloadDto): Promise<void> {
-    this.logger.log(`Received webhook: ${payload.event_type}`);
-
-    const { message } = payload;
-
-    const classification = await this.emailClassifierService.classifyEmail(
-      message.subject,
-      message.text,
-    );
-
-    const enrichedMessage = {
-      id: message.message_id,
-      inboxId: message.inbox_id,
-      from: message.from,
-      to: message.to,
-      subject: message.subject,
-      text: message.text,
-      receivedAt: message.timestamp,
-      labels: classification.labels,
-      isSpam: classification.isSpam,
-      isReservation: classification.isReservation,
-    };
-
-    this.logger.log(`Email classified - Labels: ${classification.labels.join(', ')}`);
-
-    if (!classification.isSpam && classification.isReservation) {
-      await this.handleReservation(enrichedMessage);
-    }
-  }
-
-  // Handle reservation email with AI
-  private async handleReservationWithAI(message: any): Promise<void> {
-    this.logger.log('=== RESERVATION DETECTED ===');
-    console.log(JSON.stringify(message, null, 2));
-
-    const actionResult = await this.actionSelectorService.selectAction(
-      message.subject,
-      message.text,
-      EmailContext.INITIAL,
-    );
-
-    this.logger.log(`Selected Action: ${actionResult.action}`);
-    this.logger.log(`Confidence: ${actionResult.confidence}`);
-    this.logger.log(`Reasoning: ${actionResult.reasoning}`);
-
-    console.log(
-      JSON.stringify(
-        {
-          action: actionResult.action,
-          confidence: actionResult.confidence,
-          reasoning: actionResult.reasoning,
-        },
-        null,
-        2,
-      ),
-    );
-
-    if (actionResult.action === EmailAction.CONFIRM) {
-      const emailText = await this.emailResponseGeneratorService.generateEmail({
-        action: EmailAction.CONFIRM,
-        context: {},
-        recipientName: message.from.split('@')[0],
-        senderName: 'AgentMail AI',
-        meetingPurpose: message.subject,
-      });
-    }
-
-    const availableSlots = await this.schedulerService.findAvailableSlots(
-      {
-        meetingDuration: 60,
-        workingHours: {
-          start: '09:00',
-          end: '18:00',
-        },
-      },
-      'sandbox:juungbae@gmail.com', // TODO: Get user ID from message or context as needed
-    );
   }
 }
 

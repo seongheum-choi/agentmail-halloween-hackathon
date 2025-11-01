@@ -1,13 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ChatGPTService } from '../../agent/services/chatgpt.service';
 import { z } from 'zod';
-import { EmailAction, EmailContext, ActionSelectionResult } from '../types/action.types';
+import { EmailAction, EmailContext, ActionSelectionResult, TimeSlot } from '../types/action.types';
+
+const TimeSlotSchema = z.object({
+  date: z.string(),
+  startTime: z.string(),
+  endTime: z.string(),
+});
 
 const ActionSelectionSchema = z.object({
   action: z.enum(['OFFER', 'CHECK_TIME', 'CONFIRM', 'COUNTEROFFER']),
   confidence: z.number().min(0).max(1),
   reasoning: z.string(),
-  timeSuggestion: z.string().nullable().optional(),
+  timeSuggestions: z.array(TimeSlotSchema).nullable().optional(),
 });
 
 @Injectable()
@@ -42,7 +48,7 @@ export class ActionSelectorService {
         action: result.action as EmailAction,
         confidence: result.confidence,
         reasoning: result.reasoning,
-        timeSuggestion: result.timeSuggestion,
+        timeSuggestions: result.timeSuggestions || null,
       };
     } catch (error) {
       this.logger.error(`Error selecting action: ${error.message}`);
@@ -83,8 +89,17 @@ For INITIAL emails (first contact), you can select from these actions:
 
 Respond with a JSON object containing:
 - action: One of ["OFFER", "CHECK_TIME", "CONFIRM"]
+- confidence: A number between 0 and 1 indicating your confidence in this classification
 - reasoning: Brief explanation of why you selected this action
-- timeInformation: If action is CHECK_TIME or CONFIRM, extract and provide the proposed date/time as a TimeSlot structure. Otherwise, set to null.`,
+- timeSuggestions: An array of TimeSlot objects. Each TimeSlot should have:
+  * date: ISO 8601 format (YYYY-MM-DD)
+  * startTime: HH:mm format (e.g., "14:00")
+  * endTime: HH:mm format (e.g., "15:00")
+
+  Extract any time/date information from the email and format it as TimeSlot objects.
+  If no specific time is mentioned, set to null.
+
+Example TimeSlot: {"date": "2025-11-15", "startTime": "14:00", "endTime": "15:00"}`,
       };
     } else {
       return {
@@ -101,7 +116,10 @@ With time context, you can select from these actions:
 
 Respond with a JSON object containing:
 - action: One of ["CONFIRM", "COUNTEROFFER"]
-- reasoning: Brief explanation of why you selected this action`,
+- confidence: A number between 0 and 1 indicating your confidence in this classification
+- reasoning: Brief explanation of why you selected this action
+- timeSuggestions: An array of TimeSlot objects with date (YYYY-MM-DD), startTime (HH:mm), and endTime (HH:mm).
+  Extract any time/date information from the email. Set to null if no specific time is mentioned.`,
       };
     }
   }
