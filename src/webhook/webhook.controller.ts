@@ -26,7 +26,7 @@ export class WebhookController {
   async handleAgentMailWebhook(@Body() payload: WebhookPayloadDto) {
     this.logger.log('AgentMail webhook received');
 
-    this.webhookService.handleWebhook(payload).catch((error) => {
+    this.webhookService.handleWebhookWithAI(payload).catch((error) => {
       this.logger.error(`Error processing AgentMail webhook: ${error.message}`, error.stack);
     });
 

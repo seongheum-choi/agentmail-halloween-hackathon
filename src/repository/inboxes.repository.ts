@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConvexClientFactory } from './config/convex.config';
-import { api } from '../../convex/_generated/api';
+import { api } from '../../convex/_generated/api.js';
 import {
   CreateInboxRequest,
   CreateInboxRequestSchema,

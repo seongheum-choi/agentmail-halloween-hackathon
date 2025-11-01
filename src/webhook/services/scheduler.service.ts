@@ -48,6 +48,104 @@ export class SchedulerService {
     }
   }
 
+  async isTimeSlotAvailable(
+    timeSlot: TimeSlot,
+    userId: string = 'anonymous',
+    workingHours: { start: string; end: string } = { start: '09:00', end: '18:00' },
+  ): Promise<{ available: boolean; reason?: string }> {
+    this.logger.log(`Checking availability for time slot: ${timeSlot.date} ${timeSlot.startTime}-${timeSlot.endTime}`);
+
+    // Validate time slot format
+    if (!this.isValidTimeSlot(timeSlot)) {
+      return { available: false, reason: 'Invalid time slot format' };
+    }
+
+    // Check if the time is in the past
+    const slotDateTime = new Date(`${timeSlot.date}T${timeSlot.startTime}`);
+    const now = new Date();
+    if (slotDateTime < now) {
+      return { available: false, reason: 'Time slot is in the past' };
+    }
+
+    // Check if it's within working hours
+    if (!this.isWithinWorkingHours(timeSlot, workingHours)) {
+      return { available: false, reason: 'Time slot is outside working hours' };
+    }
+
+    // Check if it's a weekend
+    const date = new Date(timeSlot.date);
+    if (date.getDay() === 0 || date.getDay() === 6) {
+      return { available: false, reason: 'Time slot is on a weekend' };
+    }
+
+    // Query calendar for the specific date
+    const startOfDay = new Date(timeSlot.date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(timeSlot.date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    try {
+      const calendarQuery = `What are my scheduled events from ${startOfDay.toISOString()} to ${endOfDay.toISOString()}?`;
+      const calendarData = await this.hyperspellService.queryCalendar(calendarQuery, userId, true);
+
+      this.logger.debug('Calendar data received for availability check:', calendarData);
+
+      const busySlots = this.extractBusySlots(calendarData);
+      const busyTimesForDay = busySlots.get(timeSlot.date) || [];
+
+      // Check if the time slot conflicts with any busy times
+      const isConflict = this.isSlotBusy(timeSlot.startTime, timeSlot.endTime, busyTimesForDay);
+
+      if (isConflict) {
+        return { available: false, reason: 'Time slot conflicts with an existing event' };
+      }
+
+      return { available: true };
+    } catch (error) {
+      this.logger.error(`Failed to check time slot availability: ${error.message}`, error.stack);
+      return { available: false, reason: 'Unable to verify calendar availability' };
+    }
+  }
+
+  private isValidTimeSlot(timeSlot: TimeSlot): boolean {
+    if (!timeSlot.date || !timeSlot.startTime || !timeSlot.endTime) {
+      return false;
+    }
+
+    // Validate date format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(timeSlot.date)) {
+      return false;
+    }
+
+    // Validate time format (HH:MM)
+    const timeRegex = /^\d{2}:\d{2}$/;
+    if (!timeRegex.test(timeSlot.startTime) || !timeRegex.test(timeSlot.endTime)) {
+      return false;
+    }
+
+    // Validate that end time is after start time
+    const startMinutes = this.timeToMinutes(timeSlot.startTime);
+    const endMinutes = this.timeToMinutes(timeSlot.endTime);
+    if (endMinutes <= startMinutes) {
+      return false;
+    }
+
+    return true;
+  }
+
+  private isWithinWorkingHours(
+    timeSlot: TimeSlot,
+    workingHours: { start: string; end: string },
+  ): boolean {
+    const slotStart = this.timeToMinutes(timeSlot.startTime);
+    const slotEnd = this.timeToMinutes(timeSlot.endTime);
+    const workStart = this.timeToMinutes(workingHours.start);
+    const workEnd = this.timeToMinutes(workingHours.end);
+
+    return slotStart >= workStart && slotEnd <= workEnd;
+  }
+
   private calculateAvailableSlots(calendarData: any, request: SchedulingRequest): TimeSlot[] {
     const busySlots = this.extractBusySlots(calendarData);
     const slots: TimeSlot[] = [];

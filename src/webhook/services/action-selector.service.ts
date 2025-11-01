@@ -7,7 +7,14 @@ const ActionSelectionSchema = z.object({
   action: z.enum(['OFFER', 'CHECK_TIME', 'CONFIRM', 'COUNTEROFFER']),
   confidence: z.number().min(0).max(1),
   reasoning: z.string(),
-  timeSuggestion: z.string().nullable().optional(),
+  timeSuggestion: z
+    .object({
+      date: z.string(),
+      startTime: z.string(),
+      endTime: z.string(),
+    })
+    .nullable()
+    .optional(),
 });
 
 @Injectable()
@@ -84,7 +91,15 @@ For INITIAL emails (first contact), you can select from these actions:
 Respond with a JSON object containing:
 - action: One of ["OFFER", "CHECK_TIME", "CONFIRM"]
 - reasoning: Brief explanation of why you selected this action
-- timeInformation: If action is CHECK_TIME or CONFIRM, extract and provide the proposed date/time as a TimeSlot structure. Otherwise, set to null.`,
+- timeInformation: If action is CHECK_TIME or CONFIRM, extract and provide the proposed date/time as a TimeSlot structure. Otherwise, set to null.
+
+TimeSlot structure:
+{
+  date: string; // ISO 8601 format
+  startTime: string; // HH:mm format
+  endTime: string; // HH:mm format
+}
+`,
       };
     } else {
       return {
