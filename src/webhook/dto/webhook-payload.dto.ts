@@ -64,6 +64,15 @@ class MessageDto {
   @IsString()
   preview?: string;
 
+  @IsOptional()
+  @IsString()
+  in_reply_to?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  references?: string[];
+
   @IsArray()
   @IsString({ each: true })
   labels: string[];

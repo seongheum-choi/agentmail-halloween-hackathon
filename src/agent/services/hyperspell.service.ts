@@ -49,6 +49,9 @@ export class HyperspellService {
           'google_calendar',
           'google_docs',
         ],
+        options: {
+          answer_model: 'deepseek-r1',
+        },
       });
 
       return response.answer;
@@ -68,6 +71,9 @@ export class HyperspellService {
         query,
         answer,
         sources: ['google_calendar', 'vault'],
+        options: {
+          answer_model: 'deepseek-r1',
+        },
       });
 
       if (response.errors.length > 0) {

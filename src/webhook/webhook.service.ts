@@ -258,15 +258,14 @@ export class WebhookService {
 
     // Handle CHECK_TIME action
     if (actionResult.action === EmailAction.CHECK_TIME) {
-      const checkTimeAvailableAt = this.schedulerService.isTimeSlotAvailable(
+      const answerTimeResult = this.schedulerService.isTimeSlotAvailable(
         actionResult.timeSuggestions ? actionResult.timeSuggestions[0] : null,
         `sandbox:${targetUser.email}`, // TODO: Get user ID from message or context as needed
       );
 
       const timeAvailablityActionResult = await this.actionSelectorService.selectAction(
         message.subject,
-        message.text +
-          `And the given time slot is ${checkTimeAvailableAt ? 'available' : 'not available'}.`,
+        message.text + `And time availability: ${answerTimeResult}`,
         EmailContext.AFTER_CHECK_TIME,
       );
 
