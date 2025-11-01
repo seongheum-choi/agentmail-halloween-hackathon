@@ -2,6 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { WebhookPayloadDto } from './dto/webhook-payload.dto';
 import { EmailClassifierService } from './services/email-classifier.service';
 import { ActionSelectorService } from './services/action-selector.service';
+import { SchedulerService } from './services/scheduler.service';
+import { CalendarInviteService } from './services/calendar-invite.service';
+import { EmailSenderService } from './services/email-sender.service';
 import { EmailContext } from './types/action.types';
 
 @Injectable()
@@ -11,6 +14,9 @@ export class WebhookService {
   constructor(
     private readonly emailClassifierService: EmailClassifierService,
     private readonly actionSelectorService: ActionSelectorService,
+    private readonly schedulerService: SchedulerService,
+    private readonly calendarInviteService: CalendarInviteService,
+    private readonly emailSenderService: EmailSenderService,
   ) {}
 
   async handleWebhook(payload: WebhookPayloadDto): Promise<void> {
@@ -63,6 +69,67 @@ export class WebhookService {
       confidence: actionResult.confidence,
       reasoning: actionResult.reasoning,
     }, null, 2));
+
+    const availableSlots = await this.schedulerService.findAvailableSlots(
+      {
+        meetingDuration: 60,
+        workingHours: {
+          start: '09:00',
+          end: '18:00',
+        },
+      },
+      'anonymous',
+    );
+
+    this.logger.log(`Found ${availableSlots.length} available slots`);
+
+    if (availableSlots.length > 0) {
+      const firstSlot = availableSlots[0];
+      const startDateTime = new Date(`${firstSlot.date}T${firstSlot.startTime}:00`);
+      const endDateTime = new Date(`${firstSlot.date}T${firstSlot.endTime}:00`);
+
+      const icsContent = this.calendarInviteService.generateICS({
+        summary: message.subject,
+        description: `Meeting scheduled in response to: ${message.text.substring(0, 100)}...`,
+        location: 'To be determined',
+        startTime: startDateTime,
+        endTime: endDateTime,
+        organizer: {
+          name: 'AgentMail AI',
+          email: message.to,
+        },
+        attendees: [
+          {
+            name: message.from.split('@')[0],
+            email: message.from,
+          },
+        ],
+      });
+
+      const emailText = `Thank you for your message.
+
+I would like to schedule a meeting with you. Based on my availability, I propose the following time:
+
+Date: ${firstSlot.date}
+Time: ${firstSlot.startTime} - ${firstSlot.endTime}
+
+${availableSlots.length > 1 ? `Alternative time slots:\n${availableSlots.slice(1).map((slot, idx) => `${idx + 2}. ${slot.date} at ${slot.startTime} - ${slot.endTime}`).join('\n')}` : ''}
+
+Please find the calendar invitation attached. Looking forward to meeting with you.
+
+Best regards,
+AgentMail AI`;
+
+      await this.emailSenderService.sendEmailWithCalendarInvite({
+        from: message.to,
+        to: message.from,
+        subject: `Re: ${message.subject}`,
+        text: emailText,
+        icsContent,
+      });
+
+      this.logger.log(`Response email sent to: ${message.from}`);
+    }
 
     this.logger.log('============================');
   }
