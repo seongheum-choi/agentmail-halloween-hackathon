@@ -128,15 +128,20 @@ export class WebhookService {
       }
     })();
 
+    // Get inbox information for persona
+    const inbox = await this.inboxRepository.getByInboxId({ inboxId: message.inboxId });
+
     const emailContentToSend = await this.emailResponseGeneratorService.generateEmail(
       {
         action: actionResult.action,
         context,
         recipientName: message.from.split('@')[0],
-        senderName: 'AgentMail AI',
+        senderName: inbox?.name || 'AgentMail AI',
         meetingPurpose: message.subject,
       },
       threadContext,
+      inbox?.persona,
+      inbox?.name,
     );
 
     const icsContent = await this.generateICSForConfirm(actionResult.action, timeSuggestions, message);
@@ -301,15 +306,23 @@ Output: Website Redesign Kickoff`,
     );
 
     if (actionResult.action === EmailAction.CONFIRM) {
-      const emailText = await this.emailResponseGeneratorService.generateEmail({
-        action: EmailAction.CONFIRM,
-        context: {
-          confirmedTimeSlot: actionResult.timeSuggestions ? actionResult.timeSuggestions[0] : null,
+      // inboxUser and targetUser are already fetched above (lines 284-285)
+      const inbox = await this.inboxRepository.getByInboxId({ inboxId: message.inboxId });
+
+      const emailText = await this.emailResponseGeneratorService.generateEmail(
+        {
+          action: EmailAction.CONFIRM,
+          context: {
+            confirmedTimeSlot: actionResult.timeSuggestions ? actionResult.timeSuggestions[0] : null,
+          },
+          recipientName: message.from.split('@')[0],
+          senderName: inbox?.name || 'AgentMail AI',
+          meetingPurpose: message.subject,
         },
-        recipientName: message.from.split('@')[0],
-        senderName: 'AgentMail AI',
-        meetingPurpose: message.subject,
-      });
+        null,
+        inbox?.persona,
+        inbox?.name,
+      );
 
       const enrichedMessage = {
         ...message,
@@ -348,17 +361,24 @@ Output: Website Redesign Kickoff`,
       );
 
       if (timeAvailablityActionResult.action === EmailAction.CONFIRM) {
-        const emailText = await this.emailResponseGeneratorService.generateEmail({
-          action: EmailAction.CONFIRM,
-          context: {
-            confirmedTimeSlot: actionResult.timeSuggestions
-              ? actionResult.timeSuggestions[0]
-              : null,
+        const inbox = await this.inboxRepository.getByInboxId({ inboxId: message.inboxId });
+
+        const emailText = await this.emailResponseGeneratorService.generateEmail(
+          {
+            action: EmailAction.CONFIRM,
+            context: {
+              confirmedTimeSlot: actionResult.timeSuggestions
+                ? actionResult.timeSuggestions[0]
+                : null,
+            },
+            recipientName: message.from.split('@')[0],
+            senderName: inbox?.name || 'AgentMail AI',
+            meetingPurpose: message.subject,
           },
-          recipientName: message.from.split('@')[0],
-          senderName: 'AgentMail AI',
-          meetingPurpose: message.subject,
-        });
+          null,
+          inbox?.persona,
+          inbox?.name,
+        );
 
         const enrichedMessage = {
           ...message,
@@ -393,16 +413,23 @@ Output: Website Redesign Kickoff`,
           `sandbox:${targetUser.email}`, // TODO: Get user ID from message or context as needed
         );
 
-        const emailText = await this.emailResponseGeneratorService.generateEmail({
-          action: EmailAction.COUNTEROFFER,
-          context: {
-            proposedTimeSlot: actionResult.timeSuggestions ? actionResult.timeSuggestions[0] : null,
-            alternativeTimeSlots: availableSlots,
+        const inbox = await this.inboxRepository.getByInboxId({ inboxId: message.inboxId });
+
+        const emailText = await this.emailResponseGeneratorService.generateEmail(
+          {
+            action: EmailAction.COUNTEROFFER,
+            context: {
+              proposedTimeSlot: actionResult.timeSuggestions ? actionResult.timeSuggestions[0] : null,
+              alternativeTimeSlots: availableSlots,
+            },
+            recipientName: message.from.split('@')[0],
+            senderName: inbox?.name || 'AgentMail AI',
+            meetingPurpose: message.subject,
           },
-          recipientName: message.from.split('@')[0],
-          senderName: 'AgentMail AI',
-          meetingPurpose: message.subject,
-        });
+          null,
+          inbox?.persona,
+          inbox?.name,
+        );
 
         await this.agentMailService.replyToMessage({
           inboxId: message.inboxId,
@@ -423,15 +450,22 @@ Output: Website Redesign Kickoff`,
         `sandbox:${targetUser.email}`, // TODO: Get user ID from message or context as needed
       );
 
-      const emailText = await this.emailResponseGeneratorService.generateEmail({
-        action: EmailAction.OFFER,
-        context: {
-          availableTimeSlots: availableSlots,
+      const inbox = await this.inboxRepository.getByInboxId({ inboxId: message.inboxId });
+
+      const emailText = await this.emailResponseGeneratorService.generateEmail(
+        {
+          action: EmailAction.OFFER,
+          context: {
+            availableTimeSlots: availableSlots,
+          },
+          recipientName: message.from.split('@')[0],
+          senderName: inbox?.name || 'AgentMail AI',
+          meetingPurpose: message.subject,
         },
-        recipientName: message.from.split('@')[0],
-        senderName: 'AgentMail AI',
-        meetingPurpose: message.subject,
-      });
+        null,
+        inbox?.persona,
+        inbox?.name,
+      );
 
       await this.agentMailService.replyToMessage({
         inboxId: message.inboxId,
