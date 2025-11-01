@@ -8,13 +8,13 @@
       {
         "include": "../convex/_generated/**/*",
         "outDir": "dist/convex"
-      }
-    ],
-    "watchAssets": true
+      },
+      {
         "include": "../public/**/*",
         "outDir": "dist/public",
         "watchAssets": true
       }
-    ]
+    ],
+    "watchAssets": true
   }
 }
