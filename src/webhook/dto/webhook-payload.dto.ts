@@ -1,63 +1,52 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray, ValidateNested, IsObject } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsArray, ValidateNested, IsNumber, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
-
-class AddressDto {
-  @IsString()
-  @IsNotEmpty()
-  email: string;
-
-  @IsOptional()
-  @IsString()
-  name?: string;
-}
-
-class AttachmentDto {
-  @IsString()
-  @IsNotEmpty()
-  filename: string;
-
-  @IsString()
-  @IsNotEmpty()
-  content_type: string;
-
-  @IsString()
-  @IsNotEmpty()
-  content_id: string;
-
-  @IsOptional()
-  @IsString()
-  url?: string;
-}
 
 class MessageDto {
   @IsString()
   @IsNotEmpty()
-  id: string;
+  message_id: string;
 
   @IsString()
   @IsNotEmpty()
   thread_id: string;
 
-  @ValidateNested()
-  @Type(() => AddressDto)
-  from: AddressDto;
+  @IsString()
+  @IsNotEmpty()
+  smtp_id: string;
+
+  @IsString()
+  @IsNotEmpty()
+  inbox_id: string;
+
+  @IsString()
+  @IsNotEmpty()
+  organization_id: string;
+
+  @IsString()
+  @IsNotEmpty()
+  pod_id: string;
+
+  @IsString()
+  @IsNotEmpty()
+  from: string;
+
+  @IsString()
+  @IsNotEmpty()
+  from_: string;
 
   @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => AddressDto)
-  to: AddressDto[];
+  @IsString({ each: true })
+  to: string[];
 
   @IsOptional()
   @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => AddressDto)
-  cc?: AddressDto[];
+  @IsString({ each: true })
+  cc?: string[];
 
   @IsOptional()
   @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => AddressDto)
-  bcc?: AddressDto[];
+  @IsString({ each: true })
+  bcc?: string[];
 
   @IsString()
   @IsNotEmpty()
@@ -72,20 +61,45 @@ class MessageDto {
   html?: string;
 
   @IsOptional()
+  @IsString()
+  preview?: string;
+
   @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => AttachmentDto)
-  attachments?: AttachmentDto[];
+  @IsString({ each: true })
+  labels: string[];
+
+  @IsNumber()
+  size: number;
 
   @IsString()
   @IsNotEmpty()
-  received_at: string;
+  timestamp: string;
+
+  @IsString()
+  @IsNotEmpty()
+  created_at: string;
+
+  @IsString()
+  @IsNotEmpty()
+  updated_at: string;
 }
 
 export class WebhookPayloadDto {
   @IsString()
   @IsNotEmpty()
+  type: string;
+
+  @IsString()
+  @IsNotEmpty()
+  event_id: string;
+
+  @IsString()
+  @IsNotEmpty()
   event_type: string;
+
+  @IsOptional()
+  @IsBoolean()
+  body_included?: boolean;
 
   @ValidateNested()
   @Type(() => MessageDto)

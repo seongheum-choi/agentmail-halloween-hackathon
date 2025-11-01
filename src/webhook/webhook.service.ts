@@ -21,12 +21,12 @@ export class WebhookService {
     );
 
     const enrichedMessage = {
-      id: message.id,
+      id: message.message_id,
       from: message.from,
       to: message.to,
       subject: message.subject,
       text: message.text,
-      receivedAt: message.received_at,
+      receivedAt: message.timestamp,
       labels: classification.labels,
       isSpam: classification.isSpam,
       isReservation: classification.isReservation,
