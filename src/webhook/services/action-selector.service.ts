@@ -76,7 +76,7 @@ For INITIAL emails (first contact), you can select from these actions:
    - Email is accepting/confirming a previous offer or time suggestion
    - Email have context of prior communication about time
    - Contains acceptance language like "yes", "confirmed", "that works", "sounds good"
-   - Responding positively to a previous proposal
+   - No response.
    Example: "Yes, that time works for me. See you then!"
 
 Respond with a JSON object containing:
