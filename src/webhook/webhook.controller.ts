@@ -17,6 +17,7 @@ export class WebhookController {
       this.logger.error(`Error processing webhook: ${error.message}`, error.stack);
     });
 
+    // TODO: Should labeling given email with purpose.
     return { success: true };
   }
 }
