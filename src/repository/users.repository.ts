@@ -128,7 +128,7 @@ export class UsersRepository {
         id: validatedRequest.id as any, // Convex ID type
         ...(validatedRequest.email && { email: validatedRequest.email }),
         ...(validatedRequest.name && { name: validatedRequest.name }),
-        ...(validatedRequest.settings && { settings: validatedRequest.settings }),
+        ...(validatedRequest.preferences && { preferences: validatedRequest.preferences }),
         ...(validatedRequest.integrations && { integrations: validatedRequest.integrations }),
       });
 
