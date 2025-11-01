@@ -16,7 +16,7 @@ export class EmailClassifierService {
 
   constructor(private readonly chatGPTService: ChatGPTService) {}
 
-  async classifyEmail(subject: string, text: string): Promise<ClassificationResult> {
+  async classifyEmail(subject: string, text: string, threadContext: any = null): Promise<ClassificationResult> {
     this.logger.log(`Classifying email: ${subject}`);
 
     try {
@@ -37,7 +37,20 @@ Examples:
 - Restaurant reservation -> {"labels": ["RESERVATION"], "isSpam": false, "isReservation": true}`,
       };
 
-      const userMessage = `Subject: ${subject}\n\nBody: ${text.substring(0, 1000)}`;
+      let userMessage = `Subject: ${subject}\n\nBody: ${text.substring(0, 1000)}`;
+
+      if (threadContext && threadContext.messages && threadContext.messages.length > 0) {
+        const threadHistory = threadContext.messages
+          .map((msg: any, idx: number) => {
+            const from = msg.from || 'Unknown';
+            const timestamp = msg.timestamp || msg.createdAt || 'Unknown time';
+            const msgText = msg.text || msg.body || '';
+            return `[${idx + 1}] From: ${from} | Time: ${timestamp}\n${msgText}`;
+          })
+          .join('\n\n---\n\n');
+
+        userMessage = `Thread History (${threadContext.messages.length} messages):\n\n${threadHistory}\n\n---\n\nCurrent Email:\nSubject: ${subject}\n\nBody: ${text.substring(0, 1000)}`;
+      }
 
       const result = await this.chatGPTService.sendMessageWithFormat(
         userMessage,

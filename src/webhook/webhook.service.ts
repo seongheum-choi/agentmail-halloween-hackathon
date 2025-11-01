@@ -35,9 +35,19 @@ export class WebhookService {
 
     const { message } = payload;
 
+    let threadContext = null;
+    try {
+      this.logger.log(`Fetching thread context for thread_id: ${message.thread_id}`);
+      threadContext = await this.agentMailService.getThread(message.thread_id);
+      this.logger.log(`Thread context fetched successfully with ${threadContext.messages?.length || 0} messages`);
+    } catch (error) {
+      this.logger.warn(`Failed to fetch thread context: ${error.message}. Continuing without context.`);
+    }
+
     const classification = await this.emailClassifierService.classifyEmail(
       message.subject,
       message.text,
+      threadContext,
     );
 
     const enrichedMessage = {
@@ -56,7 +66,7 @@ export class WebhookService {
     this.logger.log(`Email classified - Labels: ${classification.labels.join(', ')}`);
 
     if (!classification.isSpam && classification.isReservation) {
-      await this.handleReservation(enrichedMessage);
+      await this.handleReservation(enrichedMessage, threadContext);
     }
   }
 
@@ -66,7 +76,7 @@ export class WebhookService {
   }
 
   // Use this for testing webhook
-  private async handleReservation(message: EnrichedMessage): Promise<void> {
+  private async handleReservation(message: EnrichedMessage, threadContext: any = null): Promise<void> {
     this.logger.log('=== RESERVATION DETECTED ===');
     this.logger.log(`Enriched Message: ${JSON.stringify(message, null, 2)}`);
 
@@ -74,6 +84,7 @@ export class WebhookService {
       message.subject,
       message.text,
       EmailContext.INITIAL,
+      threadContext,
     );
 
     this.logger.log(`Selected Action: ${actionResult.action}`);
@@ -105,13 +116,16 @@ export class WebhookService {
       }
     })();
 
-    const emailContentToSend = await this.emailResponseGeneratorService.generateEmail({
-      action: actionResult.action,
-      context,
-      recipientName: message.from.split('@')[0],
-      senderName: 'AgentMail AI',
-      meetingPurpose: message.subject,
-    });
+    const emailContentToSend = await this.emailResponseGeneratorService.generateEmail(
+      {
+        action: actionResult.action,
+        context,
+        recipientName: message.from.split('@')[0],
+        senderName: 'AgentMail AI',
+        meetingPurpose: message.subject,
+      },
+      threadContext,
+    );
 
     let icsContent: string | undefined;
     if (actionResult.action === EmailAction.CONFIRM && timeSuggestions.length > 0) {

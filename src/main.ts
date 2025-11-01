@@ -17,7 +17,9 @@ async function bootstrap() {
 
   app.enableCors();
 
-  app.useStaticAssets(join(__dirname, '..', 'public'));
+  const publicPath = join(__dirname, '..', 'public');
+  console.log(`🔍 Public path: ${publicPath}`);
+  app.useStaticAssets(publicPath);
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
