@@ -42,9 +42,7 @@ export class WebhookService {
       isReservation: classification.isReservation,
     };
 
-    this.logger.log(
-      `Email classified - Labels: ${classification.labels.join(', ')}`,
-    );
+    this.logger.log(`Email classified - Labels: ${classification.labels.join(', ')}`);
 
     if (!classification.isSpam && classification.isReservation) {
       await this.handleReservation(enrichedMessage);
@@ -65,11 +63,17 @@ export class WebhookService {
     this.logger.log(`Confidence: ${actionResult.confidence}`);
     this.logger.log(`Reasoning: ${actionResult.reasoning}`);
 
-    console.log(JSON.stringify({
-      action: actionResult.action,
-      confidence: actionResult.confidence,
-      reasoning: actionResult.reasoning,
-    }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          action: actionResult.action,
+          confidence: actionResult.confidence,
+          reasoning: actionResult.reasoning,
+        },
+        null,
+        2,
+      ),
+    );
 
     const availableSlots = await this.schedulerService.findAvailableSlots(
       {
@@ -114,7 +118,14 @@ I would like to schedule a meeting with you. Based on my availability, I propose
 Date: ${firstSlot.date}
 Time: ${firstSlot.startTime} - ${firstSlot.endTime}
 
-${availableSlots.length > 1 ? `Alternative time slots:\n${availableSlots.slice(1).map((slot, idx) => `${idx + 2}. ${slot.date} at ${slot.startTime} - ${slot.endTime}`).join('\n')}` : ''}
+${
+  availableSlots.length > 1
+    ? `Alternative time slots:\n${availableSlots
+        .slice(1)
+        .map((slot, idx) => `${idx + 3}. ${slot.date} at ${slot.startTime} - ${slot.endTime}`)
+        .join('\n')}`
+    : ''
+}
 
 Please find the calendar invitation attached. Looking forward to meeting with you.
 
@@ -126,6 +137,7 @@ AgentMail AI`;
         messageId: message.id,
         text: emailText,
         icsContent,
+        cc: message.to.split(',').map((email: string) => email.trim()),
       });
 
       this.logger.log(`Response email sent to: ${message.from}`);

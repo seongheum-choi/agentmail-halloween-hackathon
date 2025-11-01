@@ -85,6 +85,7 @@ export class AgentMailService {
     messageId: string;
     text: string;
     icsContent?: string;
+    cc?: string[];
   }): Promise<void> {
     try {
       this.logger.log(`Replying to message ${params.messageId} in inbox ${params.inboxId}`);
@@ -92,6 +93,11 @@ export class AgentMailService {
       const replyParams: any = {
         text: params.text,
       };
+
+      if (params.cc && params.cc.length > 0) {
+        replyParams.cc = params.cc;
+        this.logger.log(`Including CC recipients: ${params.cc.join(', ')}`);
+      }
 
       if (params.icsContent) {
         replyParams.attachments = [
@@ -103,11 +109,7 @@ export class AgentMailService {
         ];
       }
 
-      await this.client.inboxes.messages.reply(
-        params.inboxId,
-        params.messageId,
-        replyParams,
-      );
+      await this.client.inboxes.messages.reply(params.inboxId, params.messageId, replyParams);
 
       this.logger.log(`Reply sent successfully to message ${params.messageId}`);
     } catch (error) {
