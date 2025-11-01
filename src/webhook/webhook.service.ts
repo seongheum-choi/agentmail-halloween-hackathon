@@ -137,32 +137,7 @@ export class WebhookService {
       threadContext,
     );
 
-    let icsContent: string | undefined;
-    if (actionResult.action === EmailAction.CONFIRM && timeSuggestions.length > 0) {
-      const confirmedSlot = timeSuggestions[0];
-      const startDateTime = new Date(`${confirmedSlot.date}T${confirmedSlot.startTime}:00`);
-      const endDateTime = new Date(`${confirmedSlot.date}T${confirmedSlot.endTime}:00`);
-
-      icsContent = this.calendarInviteService.generateICS({
-        summary: message.subject,
-        description: `Meeting confirmed: ${message.subject}`,
-        location: 'To be determined',
-        startTime: startDateTime,
-        endTime: endDateTime,
-        organizer: {
-          name: 'AgentMail AI',
-          email: message.to[0],
-        },
-        attendees: [
-          {
-            name: message.from.split('@')[0],
-            email: message.from,
-          },
-        ],
-      });
-
-      this.logger.log('Generated ICS for CONFIRM action');
-    }
+    const icsContent = this.generateICSForConfirm(actionResult.action, timeSuggestions, message);
 
     await this.agentMailService.replyToMessage({
       inboxId: message.inboxId,
@@ -171,6 +146,42 @@ export class WebhookService {
       icsContent,
       cc: null, // TODO: Fill the cc recipients from the user's profile
     });
+  }
+
+  private generateICSForConfirm(
+    action: EmailAction,
+    timeSuggestions: any[],
+    message: EnrichedMessage,
+  ): string | undefined {
+    if (action !== EmailAction.CONFIRM || timeSuggestions.length === 0) {
+      return undefined;
+    }
+
+    const confirmedSlot = timeSuggestions[0];
+    const startDateTime = new Date(`${confirmedSlot.date}T${confirmedSlot.startTime}:00`);
+    const endDateTime = new Date(`${confirmedSlot.date}T${confirmedSlot.endTime}:00`);
+
+    const icsContent = this.calendarInviteService.generateICS({
+      summary: message.subject,
+      description: `Meeting confirmed: ${message.subject}`,
+      location: 'To be determined',
+      startTime: startDateTime,
+      endTime: endDateTime,
+      organizer: {
+        name: 'AgentMail AI',
+        email: message.to[0],
+      },
+      attendees: [
+        {
+          name: message.from.split('@')[0],
+          email: message.from,
+        },
+      ],
+    });
+
+    this.logger.log('Generated ICS for CONFIRM action');
+
+    return icsContent;
   }
 
   // Handle webhook with AI classification and action selection
@@ -245,10 +256,22 @@ export class WebhookService {
         meetingPurpose: message.subject,
       });
 
+      const enrichedMessage = {
+        ...message,
+        to: [message.to],
+      };
+
+      const icsContent = this.generateICSForConfirm(
+        actionResult.action,
+        actionResult.timeSuggestions || [],
+        enrichedMessage,
+      );
+
       await this.agentMailService.replyToMessage({
         inboxId: message.inboxId,
         messageId: message.id,
         text: emailText,
+        icsContent,
         cc: null, // TODO: Get cc from user profile if needed
       });
 
@@ -282,10 +305,22 @@ export class WebhookService {
           meetingPurpose: message.subject,
         });
 
+        const enrichedMessage = {
+          ...message,
+          to: [message.to],
+        };
+
+        const icsContent = this.generateICSForConfirm(
+          timeAvailablityActionResult.action,
+          actionResult.timeSuggestions || [],
+          enrichedMessage,
+        );
+
         await this.agentMailService.replyToMessage({
           inboxId: message.inboxId,
           messageId: message.id,
           text: emailText,
+          icsContent,
           cc: [targetUser.email],
         });
 
