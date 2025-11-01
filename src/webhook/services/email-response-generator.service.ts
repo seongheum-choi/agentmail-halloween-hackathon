@@ -6,12 +6,15 @@ import {
   ConfirmEmailContext,
   CounterOfferEmailContext,
 } from '../types/action.types';
+import { ChatGPTService } from '../../agent/services/chatgpt.service';
 
 @Injectable()
 export class EmailResponseGeneratorService {
   private readonly logger = new Logger(EmailResponseGeneratorService.name);
 
-  generateEmail(request: EmailGenerationRequest): string {
+  constructor(private readonly chatGPTService: ChatGPTService) {}
+
+  async generateEmail(request: EmailGenerationRequest): Promise<string> {
     this.logger.log(`Generating email for action: ${request.action}`);
 
     switch (request.action) {
@@ -41,7 +44,62 @@ export class EmailResponseGeneratorService {
     }
   }
 
-  private generateOfferEmail(
+  private async generateOfferEmail(
+    context: OfferEmailContext,
+    recipientName?: string,
+    senderName?: string,
+    meetingPurpose?: string,
+  ): Promise<string> {
+    const timeSlots = context.availableTimeSlots
+      .map((slot, index) => {
+        const formattedDate = this.formatDateForEmail(slot.date);
+        const timeRange = `${slot.startTime} - ${slot.endTime}`;
+        return `${index + 1}. ${formattedDate} at ${timeRange}`;
+      })
+      .join('\n');
+
+    const systemMessage = {
+      role: 'system' as const,
+      content: `You are a professional email assistant. Generate a polite and professional email to offer meeting time slots.
+
+Rules:
+- Use appropriate greeting based on recipient name (formal if name provided, casual if not)
+- Be professional and courteous
+- Clearly present the available time slots
+- Ask the recipient to choose or suggest alternatives
+- Include appropriate closing and signature if sender name is provided
+- Keep the tone warm but professional
+- DO NOT use any special formatting like bold (**text**) or markdown`,
+    };
+
+    const userMessage = `Generate an email with the following information:
+
+Action: Offer meeting time slots
+${recipientName ? `Recipient Name: ${recipientName}` : 'Recipient: (no specific name)'}
+${senderName ? `Sender Name: ${senderName}` : 'Sender: (no specific name)'}
+${meetingPurpose ? `Meeting Purpose: ${meetingPurpose}` : 'Meeting Purpose: (not specified)'}
+
+Available Time Slots:
+${timeSlots}
+
+Generate a complete email body that offers these time slots professionally.`;
+
+    try {
+      const emailContent = await this.chatGPTService.sendMessage(
+        userMessage,
+        [systemMessage],
+        0.7,
+        1000,
+      );
+      return emailContent;
+    } catch (error) {
+      this.logger.error(`Error generating offer email with AI: ${error.message}`);
+      // Fallback to simple template
+      return this.generateSimpleOfferEmail(context, recipientName, senderName, meetingPurpose);
+    }
+  }
+
+  private generateSimpleOfferEmail(
     context: OfferEmailContext,
     recipientName?: string,
     senderName?: string,
@@ -75,7 +133,59 @@ Please let me know which time works best for you, or feel free to suggest an alt
 I look forward to hearing from you.${signature}`;
   }
 
-  private generateConfirmEmail(
+  private async generateConfirmEmail(
+    context: ConfirmEmailContext,
+    recipientName?: string,
+    senderName?: string,
+    meetingPurpose?: string,
+  ): Promise<string> {
+    const formattedDate = this.formatDateForEmail(context.confirmedTimeSlot.date);
+    const timeRange = `${context.confirmedTimeSlot.startTime} - ${context.confirmedTimeSlot.endTime}`;
+
+    const systemMessage = {
+      role: 'system' as const,
+      content: `You are a professional email assistant. Generate a polite and professional email to confirm a meeting time.
+
+Rules:
+- Use appropriate greeting based on recipient name (formal if name provided, casual if not)
+- Be professional and courteous
+- Clearly confirm the scheduled meeting date and time
+- Express enthusiasm about the upcoming meeting
+- Offer flexibility for any changes if needed
+- Include appropriate closing and signature if sender name is provided
+- Keep the tone warm but professional
+- DO NOT use any special formatting like bold (**text**) or markdown`,
+    };
+
+    const userMessage = `Generate an email with the following information:
+
+Action: Confirm meeting time
+${recipientName ? `Recipient Name: ${recipientName}` : 'Recipient: (no specific name)'}
+${senderName ? `Sender Name: ${senderName}` : 'Sender: (no specific name)'}
+${meetingPurpose ? `Meeting Purpose: ${meetingPurpose}` : 'Meeting Purpose: (not specified)'}
+
+Confirmed Meeting Time:
+Date: ${formattedDate}
+Time: ${timeRange}
+
+Generate a complete email body that confirms this meeting professionally.`;
+
+    try {
+      const emailContent = await this.chatGPTService.sendMessage(
+        userMessage,
+        [systemMessage],
+        0.7,
+        1000,
+      );
+      return emailContent;
+    } catch (error) {
+      this.logger.error(`Error generating confirm email with AI: ${error.message}`);
+      // Fallback to simple template
+      return this.generateSimpleConfirmEmail(context, recipientName, senderName, meetingPurpose);
+    }
+  }
+
+  private generateSimpleConfirmEmail(
     context: ConfirmEmailContext,
     recipientName?: string,
     senderName?: string,
@@ -101,7 +211,71 @@ Time: ${timeRange}
 I look forward to meeting with you. If you need to make any changes, please don't hesitate to let me know.${signature}`;
   }
 
-  private generateCounterOfferEmail(
+  private async generateCounterOfferEmail(
+    context: CounterOfferEmailContext,
+    recipientName?: string,
+    senderName?: string,
+    meetingPurpose?: string,
+  ): Promise<string> {
+    const proposedDate = this.formatDateForEmail(context.proposedTimeSlot.date);
+    const proposedTime = `${context.proposedTimeSlot.startTime} - ${context.proposedTimeSlot.endTime}`;
+
+    const alternativeSlots = context.alternativeTimeSlots
+      .map((slot, index) => {
+        const formattedDate = this.formatDateForEmail(slot.date);
+        const timeRange = `${slot.startTime} - ${slot.endTime}`;
+        return `${index + 1}. ${formattedDate} at ${timeRange}`;
+      })
+      .join('\n');
+
+    const systemMessage = {
+      role: 'system' as const,
+      content: `You are a professional email assistant. Generate a polite and professional email to propose alternative meeting times.
+
+Rules:
+- Use appropriate greeting based on recipient name (formal if name provided, casual if not)
+- Be professional and courteous
+- Politely indicate that the proposed time doesn't work
+- Clearly present alternative time slots
+- Show willingness to be flexible and find a suitable time
+- Ask the recipient to choose or suggest other alternatives
+- Include appropriate closing and signature if sender name is provided
+- Keep the tone warm, apologetic but professional
+- DO NOT use any special formatting like bold (**text**) or markdown`,
+    };
+
+    const userMessage = `Generate an email with the following information:
+
+Action: Counter-offer with alternative meeting times
+${recipientName ? `Recipient Name: ${recipientName}` : 'Recipient: (no specific name)'}
+${senderName ? `Sender Name: ${senderName}` : 'Sender: (no specific name)'}
+${meetingPurpose ? `Meeting Purpose: ${meetingPurpose}` : 'Meeting Purpose: (not specified)'}
+
+Originally Proposed Time (that doesn't work):
+Date: ${proposedDate}
+Time: ${proposedTime}
+
+Alternative Time Slots:
+${alternativeSlots}
+
+Generate a complete email body that politely declines the original time and proposes these alternatives professionally.`;
+
+    try {
+      const emailContent = await this.chatGPTService.sendMessage(
+        userMessage,
+        [systemMessage],
+        0.7,
+        1000,
+      );
+      return emailContent;
+    } catch (error) {
+      this.logger.error(`Error generating counter-offer email with AI: ${error.message}`);
+      // Fallback to simple template
+      return this.generateSimpleCounterOfferEmail(context, recipientName, senderName, meetingPurpose);
+    }
+  }
+
+  private generateSimpleCounterOfferEmail(
     context: CounterOfferEmailContext,
     recipientName?: string,
     senderName?: string,
