@@ -133,9 +133,9 @@ export class WebhookService {
           throw new Error(`Unsupported action: ${actionResult.action}`);
       }
     })();
-      
+
     const inbox = await this.inboxRepository.getByInboxId({ inboxId: message.inboxId });
-    const { emailContent, subject } = await this.emailResponseGeneratorService.generateEmail(
+    const emailResponse = await this.emailResponseGeneratorService.generateEmail(
       {
         action: actionResult.action,
         context,
@@ -148,13 +148,17 @@ export class WebhookService {
       inbox?.name,
     );
 
-    const icsContent = await this.generateICSForConfirm(actionResult.action, timeSuggestions, message);
+    const icsContent = await this.generateICSForConfirm(
+      actionResult.action,
+      timeSuggestions,
+      message,
+    );
 
     await this.agentMailService.replyToMessage({
       inboxId: message.inboxId,
       messageId: message.id,
-      text: emailContent,
-      subject: meetingTitle,
+      text: emailResponse.emailContent,
+      subject: emailResponse.subject,
       icsContent,
       cc: null, // TODO: Fill the cc recipients from the user's profile
     });
@@ -162,9 +166,7 @@ export class WebhookService {
 
   private async generateCalendarTitle(subject: string): Promise<string> {
     // Clean up subject by removing Re:, RE:, Fwd:, FW: etc.
-    const cleanSubject = subject
-      .replace(/^(Re|RE|Fwd|FW|Fw):\s*/gi, '')
-      .trim();
+    const cleanSubject = subject.replace(/^(Re|RE|Fwd|FW|Fw):\s*/gi, '').trim();
 
     try {
       const systemMessage = {
@@ -206,7 +208,9 @@ Output: Website Redesign Kickoff`,
 
       return cleanedTitle;
     } catch (error) {
-      this.logger.warn(`Failed to generate calendar title with AI: ${error.message}. Using cleaned subject.`);
+      this.logger.warn(
+        `Failed to generate calendar title with AI: ${error.message}. Using cleaned subject.`,
+      );
       return cleanSubject;
     }
   }
@@ -314,11 +318,13 @@ Output: Website Redesign Kickoff`,
       // inboxUser and targetUser are already fetched above (lines 284-285)
       const inbox = await this.inboxRepository.getByInboxId({ inboxId: message.inboxId });
 
-      const emailText = await this.emailResponseGeneratorService.generateEmail(
+      const emailResponse = await this.emailResponseGeneratorService.generateEmail(
         {
           action: EmailAction.CONFIRM,
           context: {
-            confirmedTimeSlot: actionResult.timeSuggestions ? actionResult.timeSuggestions[0] : null,
+            confirmedTimeSlot: actionResult.timeSuggestions
+              ? actionResult.timeSuggestions[0]
+              : null,
           },
           recipientName: message.from.split('@')[0],
           senderName: inbox?.name || 'AgentMail AI',
@@ -369,7 +375,7 @@ Output: Website Redesign Kickoff`,
       if (timeAvailablityActionResult.action === EmailAction.CONFIRM) {
         const inbox = await this.inboxRepository.getByInboxId({ inboxId: message.inboxId });
 
-        const emailText = await this.emailResponseGeneratorService.generateEmail(
+        const emailResponse = await this.emailResponseGeneratorService.generateEmail(
           {
             action: EmailAction.CONFIRM,
             context: {
@@ -422,11 +428,13 @@ Output: Website Redesign Kickoff`,
 
         const inbox = await this.inboxRepository.getByInboxId({ inboxId: message.inboxId });
 
-        const emailText = await this.emailResponseGeneratorService.generateEmail(
+        const emailResponse = await this.emailResponseGeneratorService.generateEmail(
           {
             action: EmailAction.COUNTEROFFER,
             context: {
-              proposedTimeSlot: actionResult.timeSuggestions ? actionResult.timeSuggestions[0] : null,
+              proposedTimeSlot: actionResult.timeSuggestions
+                ? actionResult.timeSuggestions[0]
+                : null,
               alternativeTimeSlots: availableSlots,
             },
             recipientName: message.from.split('@')[0],
@@ -460,7 +468,7 @@ Output: Website Redesign Kickoff`,
 
       const inbox = await this.inboxRepository.getByInboxId({ inboxId: message.inboxId });
 
-      const emailText = await this.emailResponseGeneratorService.generateEmail(
+      const emailResponse = await this.emailResponseGeneratorService.generateEmail(
         {
           action: EmailAction.OFFER,
           context: {

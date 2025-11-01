@@ -110,7 +110,7 @@ Rules:
 - Include appropriate closing and signature if sender name is provided
 - Keep the tone warm but professional
 - DO NOT use any special formatting like bold (**text**) or markdown
-- If thread history is provided, reference the conversation context naturally${personaContext}`,
+- If thread history is provided, reference the conversation context naturally${personaContext},
 - Create a concise and professional subject line based on the meeting purpose`,
     };
 
@@ -231,7 +231,7 @@ Rules:
 - Include appropriate closing and signature if sender name is provided
 - Keep the tone warm but professional
 - DO NOT use any special formatting like bold (**text**) or markdown
-- If thread history is provided, reference the conversation context naturally${personaContext}`,
+- If thread history is provided, reference the conversation context naturally${personaContext},
 - Create a concise and professional subject line for the confirmation`,
     };
 
@@ -354,7 +354,7 @@ Rules:
 - Include appropriate closing and signature if sender name is provided
 - Keep the tone warm, apologetic but professional
 - DO NOT use any special formatting like bold (**text**) or markdown
-- If thread history is provided, reference the conversation context naturally${personaContext}`,
+- If thread history is provided, reference the conversation context naturally${personaContext},
 - Create a concise and professional subject line for the counter-offer`,
     };
 
