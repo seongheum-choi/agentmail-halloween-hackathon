@@ -6,6 +6,8 @@ AI Agent built with NestJS framework for AgentMail Halloween Hackathon.
 
 - **NestJS Framework**: Modern, scalable Node.js server-side framework
 - **AI Integration**: Anthropic Claude integration for intelligent agent capabilities
+- **Email Classification**: OpenAI GPT integration for email labeling and spam detection
+- **Webhook Support**: AgentMail webhook endpoint for real-time email processing
 - **Type Safety**: Full TypeScript implementation with strict typing
 - **Validation**: Request validation using class-validator and class-transformer
 - **Error Handling**: Global exception filters for consistent error responses
@@ -17,6 +19,7 @@ AI Agent built with NestJS framework for AgentMail Halloween Hackathon.
 - Node.js (v18 or higher)
 - npm or yarn
 - Anthropic API key
+- OpenAI API key
 
 ## Installation
 
@@ -36,9 +39,10 @@ npm install
 cp .env.example .env
 ```
 
-4. Edit `.env` and add your Anthropic API key:
+4. Edit `.env` and add your API keys:
 ```
 ANTHROPIC_API_KEY=your_actual_api_key_here
+OPENAI_API_KEY=your_actual_openai_key_here
 ```
 
 ## Running the Application
@@ -85,6 +89,40 @@ Content-Type: application/json
 }
 ```
 
+### AgentMail Webhook
+```bash
+POST /webhook
+Content-Type: application/json
+
+{
+  "event_type": "message.received",
+  "message": {
+    "id": "msg_123",
+    "thread_id": "thread_456",
+    "from": {
+      "email": "sender@example.com",
+      "name": "Sender Name"
+    },
+    "to": [
+      {
+        "email": "recipient@example.com",
+        "name": "Recipient Name"
+      }
+    ],
+    "subject": "Email Subject",
+    "text": "Email body text",
+    "html": "<p>Email body HTML</p>",
+    "received_at": "2024-01-01T00:00:00Z"
+  }
+}
+```
+
+This endpoint:
+- Receives webhook events from AgentMail
+- Classifies emails using OpenAI GPT (labels: SPAM, RESERVATION)
+- Triggers reservation callback for non-spam reservation emails
+- Returns 200 OK immediately for webhook reliability
+
 ## Testing
 
 ### Run unit tests
@@ -112,6 +150,12 @@ src/
 │   ├── agent.controller.ts    # Agent endpoints
 │   ├── agent.service.ts       # Agent business logic
 │   └── agent.module.ts        # Agent module definition
+├── webhook/                    # Webhook module
+│   ├── dto/                   # Webhook DTOs
+│   ├── services/              # Email classification service
+│   ├── webhook.controller.ts  # Webhook endpoint
+│   ├── webhook.service.ts     # Webhook business logic
+│   └── webhook.module.ts      # Webhook module definition
 ├── common/                     # Shared resources
 │   ├── filters/               # Exception filters
 │   └── interceptors/          # Logging interceptors
@@ -140,6 +184,8 @@ npm run lint
 - `PORT` - Server port (default: 3000)
 - `ANTHROPIC_API_KEY` - Your Anthropic API key
 - `ANTHROPIC_MODEL` - Model to use (default: claude-3-5-sonnet-20241022)
+- `OPENAI_API_KEY` - Your OpenAI API key
+- `OPENAI_MODEL` - Model to use for email classification (default: gpt-4o-mini)
 - `NODE_ENV` - Environment (development/production)
 
 ## License
