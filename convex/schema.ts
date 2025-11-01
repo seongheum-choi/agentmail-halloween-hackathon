@@ -5,7 +5,7 @@ export default defineSchema({
   users: defineTable({
     email: v.string(),
     name: v.string(),
-    settings: v.object({
+    preferences: v.object({
       timezone: v.string(),
       workingHours: v.object({
         start: v.string(),

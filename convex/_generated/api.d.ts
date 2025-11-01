@@ -8,6 +8,9 @@
  * @module
  */
 
+import type * as inbox from "../inbox.js";
+import type * as user from "../user.js";
+
 import type {
   ApiFromModules,
   FilterApi,
@@ -22,7 +25,10 @@ import type {
  * const myFunctionReference = api.myModule.myFunction;
  * ```
  */
-declare const fullApi: ApiFromModules<{}>;
+declare const fullApi: ApiFromModules<{
+  inbox: typeof inbox;
+  user: typeof user;
+}>;
 declare const fullApiWithMounts: typeof fullApi;
 
 export declare const api: FilterApi<
