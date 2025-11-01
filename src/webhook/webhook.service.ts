@@ -33,6 +33,12 @@ export class WebhookService {
     private readonly inboxRepository: InboxesRepository,
   ) {}
 
+  private formatMeetingTitle(purpose: string, date: string, time: string): string {
+    const dateObj = new Date(date);
+    const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+    return `${purpose} at ${time} ${dayOfWeek}`;
+  }
+
   async handleWebhook(payload: WebhookPayloadDto): Promise<void> {
     this.logger.log(`Received webhook: ${payload.event_type}`);
 
@@ -126,7 +132,7 @@ export class WebhookService {
       }
     })();
 
-    const emailContentToSend = await this.emailResponseGeneratorService.generateEmail(
+    const { emailContent, subject } = await this.emailResponseGeneratorService.generateEmail(
       {
         action: actionResult.action,
         context,
@@ -138,36 +144,43 @@ export class WebhookService {
     );
 
     let icsContent: string | undefined;
-    if (actionResult.action === EmailAction.CONFIRM && timeSuggestions.length > 0) {
-      const confirmedSlot = timeSuggestions[0];
-      const startDateTime = new Date(`${confirmedSlot.date}T${confirmedSlot.startTime}:00`);
-      const endDateTime = new Date(`${confirmedSlot.date}T${confirmedSlot.endTime}:00`);
+    let meetingTitle: string | undefined;
 
-      icsContent = this.calendarInviteService.generateICS({
-        summary: message.subject,
-        description: `Meeting confirmed: ${message.subject}`,
-        location: 'To be determined',
-        startTime: startDateTime,
-        endTime: endDateTime,
-        organizer: {
-          name: 'AgentMail AI',
-          email: message.to[0],
-        },
-        attendees: [
-          {
-            name: message.from.split('@')[0],
-            email: message.from,
+    if (timeSuggestions.length > 0) {
+      const primarySlot = timeSuggestions[0];
+      meetingTitle = this.formatMeetingTitle(subject, primarySlot.date, primarySlot.startTime);
+
+      if (actionResult.action === EmailAction.CONFIRM) {
+        const startDateTime = new Date(`${primarySlot.date}T${primarySlot.startTime}:00`);
+        const endDateTime = new Date(`${primarySlot.date}T${primarySlot.endTime}:00`);
+
+        icsContent = this.calendarInviteService.generateICS({
+          summary: meetingTitle,
+          description: `Meeting confirmed: ${subject}`,
+          location: 'To be determined',
+          startTime: startDateTime,
+          endTime: endDateTime,
+          organizer: {
+            name: 'AgentMail AI',
+            email: message.to[0],
           },
-        ],
-      });
+          attendees: [
+            {
+              name: message.from.split('@')[0],
+              email: message.from,
+            },
+          ],
+        });
 
-      this.logger.log('Generated ICS for CONFIRM action');
+        this.logger.log('Generated ICS for CONFIRM action');
+      }
     }
 
     await this.agentMailService.replyToMessage({
       inboxId: message.inboxId,
       messageId: message.id,
-      text: emailContentToSend,
+      text: emailContent,
+      subject: meetingTitle,
       icsContent,
       cc: null, // TODO: Fill the cc recipients from the user's profile
     });
@@ -235,7 +248,7 @@ export class WebhookService {
     );
 
     if (actionResult.action === EmailAction.CONFIRM) {
-      const emailText = await this.emailResponseGeneratorService.generateEmail({
+      const emailResponse = await this.emailResponseGeneratorService.generateEmail({
         action: EmailAction.CONFIRM,
         context: {
           confirmedTimeSlot: actionResult.timeSuggestions ? actionResult.timeSuggestions[0] : null,
@@ -248,7 +261,8 @@ export class WebhookService {
       await this.agentMailService.replyToMessage({
         inboxId: message.inboxId,
         messageId: message.id,
-        text: emailText,
+        text: emailResponse.emailContent,
+        subject: emailResponse.subject,
         cc: null, // TODO: Get cc from user profile if needed
       });
 
@@ -271,7 +285,7 @@ export class WebhookService {
       );
 
       if (timeAvailablityActionResult.action === EmailAction.CONFIRM) {
-        const emailText = await this.emailResponseGeneratorService.generateEmail({
+        const emailResponse = await this.emailResponseGeneratorService.generateEmail({
           action: EmailAction.CONFIRM,
           context: {
             confirmedTimeSlot: actionResult.timeSuggestions
@@ -286,7 +300,8 @@ export class WebhookService {
         await this.agentMailService.replyToMessage({
           inboxId: message.inboxId,
           messageId: message.id,
-          text: emailText,
+          text: emailResponse.emailContent,
+          subject: emailResponse.subject,
           cc: [targetUser.email],
         });
 
@@ -304,7 +319,7 @@ export class WebhookService {
           `sandbox:${targetUser.email}`, // TODO: Get user ID from message or context as needed
         );
 
-        const emailText = await this.emailResponseGeneratorService.generateEmail({
+        const emailResponse = await this.emailResponseGeneratorService.generateEmail({
           action: EmailAction.COUNTEROFFER,
           context: {
             proposedTimeSlot: actionResult.timeSuggestions ? actionResult.timeSuggestions[0] : null,
@@ -318,7 +333,8 @@ export class WebhookService {
         await this.agentMailService.replyToMessage({
           inboxId: message.inboxId,
           messageId: message.id,
-          text: emailText,
+          text: emailResponse.emailContent,
+          subject: emailResponse.subject,
           cc: [targetUser.email],
         });
       }
@@ -334,7 +350,7 @@ export class WebhookService {
         `sandbox:${targetUser.email}`, // TODO: Get user ID from message or context as needed
       );
 
-      const emailText = await this.emailResponseGeneratorService.generateEmail({
+      const emailResponse = await this.emailResponseGeneratorService.generateEmail({
         action: EmailAction.OFFER,
         context: {
           availableTimeSlots: availableSlots,
@@ -347,7 +363,8 @@ export class WebhookService {
       await this.agentMailService.replyToMessage({
         inboxId: message.inboxId,
         messageId: message.id,
-        text: emailText,
+        text: emailResponse.emailContent,
+        subject: emailResponse.subject,
         cc: [targetUser.email],
       });
     }
@@ -375,9 +392,15 @@ export class WebhookService {
       const startDateTime = new Date(`${firstSlot.date}T${firstSlot.startTime}:00`);
       const endDateTime = new Date(`${firstSlot.date}T${firstSlot.endTime}:00`);
 
+      const meetingTitle = this.formatMeetingTitle(
+        message.subject,
+        firstSlot.date,
+        firstSlot.startTime,
+      );
+
       const icsContent = this.calendarInviteService.generateICS({
-        summary: message.subject,
-        description: `Meeting scheduled in response to: ${message.text.substring(0, 100)}...`,
+        summary: meetingTitle,
+        description: `Meeting scheduled in response to: ${message.text?.substring(0, 100)}...`,
         location: 'To be determined',
         startTime: startDateTime,
         endTime: endDateTime,
@@ -387,7 +410,7 @@ export class WebhookService {
         },
         attendees: [
           {
-            name: message.from.split('@')[0],
+            name: message.from?.split('@')[0],
             email: message.from,
           },
         ],
@@ -419,6 +442,7 @@ AgentMail AI`;
         inboxId: message.inboxId,
         messageId: message.id,
         text: emailText,
+        subject: meetingTitle,
         icsContent,
         cc: null, // TODO: Fill the cc recipients from the user's profile
       });

@@ -84,6 +84,7 @@ export class AgentMailService {
     inboxId: string;
     messageId: string;
     text: string;
+    subject?: string;
     icsContent?: string;
     cc?: string[];
   }): Promise<void> {
@@ -93,6 +94,11 @@ export class AgentMailService {
       const replyParams: any = {
         text: params.text,
       };
+
+      if (params.subject) {
+        replyParams.subject = params.subject;
+        this.logger.log(`Using custom subject: ${params.subject}`);
+      }
 
       if (params.cc && params.cc.length > 0) {
         replyParams.cc = params.cc;
