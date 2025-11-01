@@ -126,7 +126,7 @@ With time context, you can select from these actions:
    - You can confirm the proposed time. If no information or no schedule, it can be confirmed.
 
 2. COUNTEROFFER - Use when:
-   - You cannot confirm the proposed time and need to suggest an alternative.
+   - You cannot confirm the proposed time and need to suggest an alternative. It is caused by a conflicting schedule.
 
 Respond with a JSON object containing:
 - action: One of ["CONFIRM", "COUNTEROFFER"]

@@ -25,7 +25,7 @@ export class ChatGPTService {
       apiKey: apiKey || '',
     });
 
-    this.model = this.configService.get<string>('OPENAI_MODEL') || 'gpt-4o-mini';
+    this.model = this.configService.get<string>('OPENAI_MODEL') || 'gpt-5';
     this.logger.log(`Initialized ChatGPT service with model: ${this.model}`);
   }
 
