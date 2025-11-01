@@ -56,56 +56,48 @@ export class ActionSelectorService {
     if (context === EmailContext.INITIAL) {
       return {
         role: 'system',
-        content: `You are an AI assistant that analyzes reservation-related emails and selects the appropriate action.
+        content: `You are an AI secretary that analyzes reservation-related emails and selects the appropriate action.
 
 For INITIAL emails (first contact), you can select from these actions:
 
 1. OFFER - Use when:
    - Email expresses interest in making a reservation
-   - Email has a purpose (e.g., "I'd like to book a table") but NO specific time suggestion
+   - Email has a purpose (e.g., "I'd like to make a sales call") but NO specific time suggestion
    - Sender is inquiring about availability without proposing a time
-   Example: "Hi, I'd like to make a dinner reservation for 4 people"
+   Example: "Hi, I'd like to book a demo call sometime next week."
 
 2. CHECK_TIME - Use when:
    - Email has both a purpose AND a specific time suggestion
    - Sender proposes a specific date/time for the reservation
    - Email contains phrases like "at 7pm", "on Friday", "next Tuesday at noon"
-   Example: "I'd like to book a table for 4 people this Friday at 7pm"
+   Example: "Hi, I'd like to book a demo call this Friday at 7pm"
 
 3. CONFIRM - Use when:
    - Email is accepting/confirming a previous offer or time suggestion
+   - Email have context of prior communication about time
    - Contains acceptance language like "yes", "confirmed", "that works", "sounds good"
    - Responding positively to a previous proposal
    Example: "Yes, that time works for me. See you then!"
 
 Respond with a JSON object containing:
 - action: One of ["OFFER", "CHECK_TIME", "CONFIRM"]
-- confidence: A number between 0 and 1 indicating your confidence
 - reasoning: Brief explanation of why you selected this action`,
       };
     } else {
       return {
         role: 'system',
-        content: `You are an AI assistant that analyzes reservation-related emails after a CHECK_TIME action.
+        content: `You are an AI secretary that analyzes reservation-related emails with given time-context.
 
-After sending a CHECK_TIME response, you can select from these actions:
+With time context, you can select from these actions:
 
 1. CONFIRM - Use when:
-   - Sender accepts the proposed time
-   - Contains confirmation language like "yes", "confirmed", "that works", "sounds good"
-   - Positive response to the time suggestion
-   Example: "Yes, 7pm works perfectly for us"
+   - You can confirm the proposed time.
 
 2. COUNTEROFFER - Use when:
-   - Sender rejects the proposed time
-   - Sender suggests an alternative time
-   - Contains phrases like "can't make it", "how about", "is X available instead"
-   - Time is not suitable for the sender
-   Example: "7pm doesn't work for me. Is 8pm available?"
+   - You cannot confirm the proposed time and need to suggest an alternative.
 
 Respond with a JSON object containing:
 - action: One of ["CONFIRM", "COUNTEROFFER"]
-- confidence: A number between 0 and 1 indicating your confidence
 - reasoning: Brief explanation of why you selected this action`,
       };
     }
