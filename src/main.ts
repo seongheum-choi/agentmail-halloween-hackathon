@@ -21,6 +21,11 @@ async function bootstrap() {
   console.log(`🔍 Public path: ${publicPath}`);
   app.useStaticAssets(publicPath);
 
+  const viewsPath = join(__dirname, '..', 'views');
+  console.log(`👁️  Views path: ${viewsPath}`);
+  app.setBaseViewsDir(viewsPath);
+  app.setViewEngine('hbs');
+
   const port = process.env.PORT || 3000;
   await app.listen(port);
 

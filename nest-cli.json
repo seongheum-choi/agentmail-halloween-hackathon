@@ -13,6 +13,11 @@
         "include": "../public/**/*",
         "outDir": "dist/public",
         "watchAssets": true
+      },
+      {
+        "include": "../views/**/*",
+        "outDir": "dist/views",
+        "watchAssets": true
       }
     ],
     "watchAssets": true

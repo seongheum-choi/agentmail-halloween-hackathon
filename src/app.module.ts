@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 import { AgentModule } from './agent/agent.module';
 import { AgentMailModule } from './agentmail/agentmail.module';
 import { WebhookModule } from './webhook/webhook.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { WebhookModule } from './webhook/webhook.module';
     AgentModule,
     AgentMailModule,
     WebhookModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],
