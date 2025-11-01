@@ -24,9 +24,8 @@ export class CalendarInviteService {
   generateICS(eventDetails: CalendarEventDetails): string {
     this.logger.log(`Generating ICS for event: ${eventDetails.summary}`);
 
-    const cal = ical({
-      domain: 'agentmail.com',
-      prodId: { company: 'AgentMail', product: 'AgentMail AI' },
+    const cal = new ical.ICalCalendar({
+      name: 'AgentMail AI',
     });
 
     const uid = `evt-${Date.now()}@agentmail.com`;

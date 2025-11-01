@@ -79,4 +79,40 @@ export class AgentMailService {
       throw error;
     }
   }
+
+  async replyToMessage(params: {
+    inboxId: string;
+    messageId: string;
+    text: string;
+    icsContent?: string;
+  }): Promise<void> {
+    try {
+      this.logger.log(`Replying to message ${params.messageId} in inbox ${params.inboxId}`);
+
+      const replyParams: any = {
+        text: params.text,
+      };
+
+      if (params.icsContent) {
+        replyParams.attachments = [
+          {
+            filename: 'invite.ics',
+            content: Buffer.from(params.icsContent).toString('base64'),
+            contentType: 'text/calendar; method=REQUEST',
+          },
+        ];
+      }
+
+      await this.client.inboxes.messages.reply(
+        params.inboxId,
+        params.messageId,
+        replyParams,
+      );
+
+      this.logger.log(`Reply sent successfully to message ${params.messageId}`);
+    } catch (error) {
+      this.logger.error(`Error replying to message ${params.messageId}`, error);
+      throw error;
+    }
+  }
 }
