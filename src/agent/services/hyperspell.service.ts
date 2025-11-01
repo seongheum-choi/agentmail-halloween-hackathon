@@ -67,7 +67,7 @@ export class HyperspellService {
       const response = await hyperspell.memories.search({
         query,
         answer,
-        sources: ['google_calendar'],
+        sources: ['google_calendar', 'vault'],
       });
 
       if (response.errors.length > 0) {

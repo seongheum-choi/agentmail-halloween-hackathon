@@ -20,4 +20,16 @@ export class WebhookController {
     // TODO: Should labeling given email with purpose.
     return { success: true };
   }
+
+  @Post('agentmail')
+  @HttpCode(200)
+  async handleAgentMailWebhook(@Body() payload: WebhookPayloadDto) {
+    this.logger.log('AgentMail webhook received');
+
+    this.webhookService.handleWebhook(payload).catch((error) => {
+      this.logger.error(`Error processing AgentMail webhook: ${error.message}`, error.stack);
+    });
+
+    return { success: true };
+  }
 }
