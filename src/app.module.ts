@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AgentModule } from './agent/agent.module';
 import { AgentMailModule } from './agentmail/agentmail.module';
+import { WebhookModule } from './webhook/webhook.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { AgentMailModule } from './agentmail/agentmail.module';
     }),
     AgentModule,
     AgentMailModule,
+    WebhookModule,
   ],
   controllers: [AppController],
   providers: [AppService],
