@@ -6,6 +6,7 @@ import { SchedulerService } from './services/scheduler.service';
 import { CalendarInviteService } from './services/calendar-invite.service';
 import { EmailResponseGeneratorService } from './services/email-response-generator.service';
 import { AgentMailService } from '../agentmail/services/agentmail.service';
+import { InboxesRepository, UsersRepository } from '@/repository';
 import {
   EmailContext,
   EmailAction,
@@ -28,6 +29,8 @@ export class WebhookService {
     private readonly calendarInviteService: CalendarInviteService,
     private readonly emailResponseGeneratorService: EmailResponseGeneratorService,
     private readonly agentMailService: AgentMailService,
+    private readonly userRepository: UsersRepository,
+    private readonly inboxRepository: InboxesRepository,
   ) {}
 
   async handleWebhook(payload: WebhookPayloadDto): Promise<void> {
@@ -39,9 +42,13 @@ export class WebhookService {
     try {
       this.logger.log(`Fetching thread context for thread_id: ${message.thread_id}`);
       threadContext = await this.agentMailService.getThread(message.thread_id);
-      this.logger.log(`Thread context fetched successfully with ${threadContext.messages?.length || 0} messages`);
+      this.logger.log(
+        `Thread context fetched successfully with ${threadContext.messages?.length || 0} messages`,
+      );
     } catch (error) {
-      this.logger.warn(`Failed to fetch thread context: ${error.message}. Continuing without context.`);
+      this.logger.warn(
+        `Failed to fetch thread context: ${error.message}. Continuing without context.`,
+      );
     }
 
     const classification = await this.emailClassifierService.classifyEmail(
@@ -76,7 +83,10 @@ export class WebhookService {
   }
 
   // Use this for testing webhook
-  private async handleReservation(message: EnrichedMessage, threadContext: any = null): Promise<void> {
+  private async handleReservation(
+    message: EnrichedMessage,
+    threadContext: any = null,
+  ): Promise<void> {
     this.logger.log('=== RESERVATION DETECTED ===');
     this.logger.log(`Enriched Message: ${JSON.stringify(message, null, 2)}`);
 
@@ -190,7 +200,7 @@ export class WebhookService {
     this.logger.log(`Email classified - Labels: ${classification.labels.join(', ')}`);
 
     if (!classification.isSpam && classification.isReservation) {
-      await this.handleReservation(enrichedMessage);
+      await this.handleReservationWithAI(enrichedMessage);
     }
   }
 
@@ -205,28 +215,144 @@ export class WebhookService {
       EmailContext.INITIAL,
     );
 
+    const inboxUser = await this.inboxRepository.getByInboxId({ inboxId: message.inboxId });
+    const targetUser = await this.userRepository.getById({ id: inboxUser.user });
+
     this.logger.log(`Selected Action: ${actionResult.action}`);
     this.logger.log(`Confidence: ${actionResult.confidence}`);
     this.logger.log(`Reasoning: ${actionResult.reasoning}`);
 
-    const emailText = await this.emailResponseGeneratorService.generateEmail({
-      action: actionResult.action,
-      context: {},
-      recipientName: message.from.split('@')[0],
-      senderName: 'AgentMail AI',
-      meetingPurpose: message.subject,
-    });
-
-    const availableSlots = await this.schedulerService.findAvailableSlots(
-      {
-        meetingDuration: 60,
-        workingHours: {
-          start: '09:00',
-          end: '18:00',
+    console.log(
+      JSON.stringify(
+        {
+          action: actionResult.action,
+          confidence: actionResult.confidence,
+          reasoning: actionResult.reasoning,
         },
-      },
-      'sandbox:juungbae@gmail.com', // TODO: Get user ID from message or context as needed
+        null,
+        2,
+      ),
     );
+
+    if (actionResult.action === EmailAction.CONFIRM) {
+      const emailText = await this.emailResponseGeneratorService.generateEmail({
+        action: EmailAction.CONFIRM,
+        context: {
+          confirmedTimeSlot: actionResult.timeSuggestions ? actionResult.timeSuggestions[0] : null,
+        },
+        recipientName: message.from.split('@')[0],
+        senderName: 'AgentMail AI',
+        meetingPurpose: message.subject,
+      });
+
+      await this.agentMailService.replyToMessage({
+        inboxId: message.inboxId,
+        messageId: message.id,
+        text: emailText,
+        cc: null, // TODO: Get cc from user profile if needed
+      });
+
+      this.logger.log(`Confirmation email sent to: ${message.from}`);
+      return;
+    }
+
+    // Handle CHECK_TIME action
+    if (actionResult.action === EmailAction.CHECK_TIME) {
+      const checkTimeAvailableAt = this.schedulerService.isTimeSlotAvailable(
+        actionResult.timeSuggestions ? actionResult.timeSuggestions[0] : null,
+        `sandbox:${targetUser.email}`, // TODO: Get user ID from message or context as needed
+      );
+
+      const timeAvailablityActionResult = await this.actionSelectorService.selectAction(
+        message.subject,
+        message.text +
+          `And the given time slot is ${checkTimeAvailableAt ? 'available' : 'not available'}.`,
+        EmailContext.AFTER_CHECK_TIME,
+      );
+
+      if (timeAvailablityActionResult.action === EmailAction.CONFIRM) {
+        const emailText = await this.emailResponseGeneratorService.generateEmail({
+          action: EmailAction.CONFIRM,
+          context: {
+            confirmedTimeSlot: actionResult.timeSuggestions
+              ? actionResult.timeSuggestions[0]
+              : null,
+          },
+          recipientName: message.from.split('@')[0],
+          senderName: 'AgentMail AI',
+          meetingPurpose: message.subject,
+        });
+
+        await this.agentMailService.replyToMessage({
+          inboxId: message.inboxId,
+          messageId: message.id,
+          text: emailText,
+          cc: [targetUser.email],
+        });
+
+        this.logger.log(`Confirmation email sent to: ${message.from}`);
+        return;
+      } else if (timeAvailablityActionResult.action === EmailAction.COUNTEROFFER) {
+        const availableSlots = await this.schedulerService.findAvailableSlots(
+          {
+            meetingDuration: 30, // TODO: Fill the meeting duration from the message object
+            workingHours: targetUser.preferences.workingHours || {
+              start: '09:00',
+              end: '18:00',
+            },
+          },
+          `sandbox:${targetUser.email}`, // TODO: Get user ID from message or context as needed
+        );
+
+        const emailText = await this.emailResponseGeneratorService.generateEmail({
+          action: EmailAction.COUNTEROFFER,
+          context: {
+            proposedTimeSlot: actionResult.timeSuggestions ? actionResult.timeSuggestions[0] : null,
+            alternativeTimeSlots: availableSlots,
+          },
+          recipientName: message.from.split('@')[0],
+          senderName: 'AgentMail AI',
+          meetingPurpose: message.subject,
+        });
+
+        await this.agentMailService.replyToMessage({
+          inboxId: message.inboxId,
+          messageId: message.id,
+          text: emailText,
+          cc: [targetUser.email],
+        });
+      }
+    } else if (actionResult.action === EmailAction.OFFER) {
+      const availableSlots = await this.schedulerService.findAvailableSlots(
+        {
+          meetingDuration: 30, // TODO: Fill the meeting duration from the message object
+          workingHours: targetUser.preferences.workingHours || {
+            start: '09:00',
+            end: '18:00',
+          },
+        },
+        `sandbox:${targetUser.email}`, // TODO: Get user ID from message or context as needed
+      );
+
+      const emailText = await this.emailResponseGeneratorService.generateEmail({
+        action: EmailAction.OFFER,
+        context: {
+          availableTimeSlots: availableSlots,
+        },
+        recipientName: message.from.split('@')[0],
+        senderName: 'AgentMail AI',
+        meetingPurpose: message.subject,
+      });
+
+      await this.agentMailService.replyToMessage({
+        inboxId: message.inboxId,
+        messageId: message.id,
+        text: emailText,
+        cc: [targetUser.email],
+      });
+    }
+
+    this.logger.log('============================');
   }
 
   private async confirmSchedule(message: any) {

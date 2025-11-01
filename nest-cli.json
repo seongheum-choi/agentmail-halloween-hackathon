@@ -6,10 +6,15 @@
     "deleteOutDir": true,
     "assets": [
       {
+        "include": "../convex/_generated/**/*",
+        "outDir": "dist/convex"
+      },
+      {
         "include": "../public/**/*",
         "outDir": "dist/public",
         "watchAssets": true
       }
-    ]
+    ],
+    "watchAssets": true
   }
 }

@@ -8,9 +8,10 @@ import { SchedulerService } from './services/scheduler.service';
 import { CalendarInviteService } from './services/calendar-invite.service';
 import { AgentModule } from '../agent/agent.module';
 import { AgentMailModule } from '../agentmail/agentmail.module';
+import { RepositoryModule } from '../repository/repository.module';
 
 @Module({
-  imports: [AgentModule, AgentMailModule],
+  imports: [AgentModule, AgentMailModule, RepositoryModule],
   controllers: [WebhookController],
   providers: [
     WebhookService,
