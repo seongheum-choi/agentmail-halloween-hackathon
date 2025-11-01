@@ -35,18 +35,11 @@ export class SchedulerService {
     const calendarQuery = `What are my scheduled events from ${today.toISOString()} to ${nextWeek.toISOString()}?`;
 
     try {
-      const calendarData = await this.hyperspellService.queryCalendar(
-        calendarQuery,
-        userId,
-        true,
-      );
+      const calendarData = await this.hyperspellService.queryCalendar(calendarQuery, userId, true);
 
       this.logger.debug('Calendar data received:', calendarData);
 
-      const availableSlots = this.calculateAvailableSlots(
-        calendarData,
-        request,
-      );
+      const availableSlots = this.calculateAvailableSlots(calendarData, request);
 
       return availableSlots;
     } catch (error) {
@@ -55,14 +48,13 @@ export class SchedulerService {
     }
   }
 
-  private calculateAvailableSlots(
-    calendarData: any,
-    request: SchedulingRequest,
-  ): TimeSlot[] {
+  private calculateAvailableSlots(calendarData: any, request: SchedulingRequest): TimeSlot[] {
+    const busySlots = this.extractBusySlots(calendarData);
     const slots: TimeSlot[] = [];
     const today = new Date();
+    const maxSlots = 3;
 
-    for (let i = 1; i <= 7; i++) {
+    for (let i = 1; i <= 7 && slots.length < maxSlots; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
 
@@ -70,26 +62,114 @@ export class SchedulerService {
         continue;
       }
 
-      const morning: TimeSlot = {
-        date: date.toISOString().split('T')[0],
-        startTime: '10:00',
-        endTime: '11:00',
-      };
+      const dateStr = date.toISOString().split('T')[0];
+      const availableTimeSlotsForDay = this.generateTimeSlotsForDay(
+        dateStr,
+        request.workingHours,
+        request.meetingDuration,
+        busySlots,
+      );
 
-      const afternoon: TimeSlot = {
-        date: date.toISOString().split('T')[0],
-        startTime: '14:00',
-        endTime: '15:00',
-      };
+      slots.push(...availableTimeSlotsForDay);
+    }
 
-      slots.push(morning, afternoon);
+    return slots.slice(0, maxSlots);
+  }
 
-      if (slots.length >= 3) {
-        break;
+  private extractBusySlots(calendarData: any): Map<string, Array<{ start: string; end: string }>> {
+    const busySlots = new Map<string, Array<{ start: string; end: string }>>();
+
+    if (!calendarData?.documents || !Array.isArray(calendarData.documents)) {
+      return busySlots;
+    }
+
+    for (const doc of calendarData.documents) {
+      try {
+        const eventData = typeof doc.content === 'string' ? JSON.parse(doc.content) : doc.content;
+
+        if (eventData.start?.dateTime && eventData.end?.dateTime) {
+          const startDate = new Date(eventData.start.dateTime);
+          const endDate = new Date(eventData.end.dateTime);
+          const dateStr = startDate.toISOString().split('T')[0];
+
+          if (!busySlots.has(dateStr)) {
+            busySlots.set(dateStr, []);
+          }
+
+          busySlots.get(dateStr).push({
+            start: this.formatTime(startDate),
+            end: this.formatTime(endDate),
+          });
+        }
+      } catch (error) {
+        this.logger.warn(`Failed to parse calendar event: ${error.message}`);
       }
     }
 
-    return slots.slice(0, 3);
+    return busySlots;
+  }
+
+  private generateTimeSlotsForDay(
+    date: string,
+    workingHours: { start: string; end: string },
+    meetingDuration: number,
+    busySlots: Map<string, Array<{ start: string; end: string }>>,
+  ): TimeSlot[] {
+    const slots: TimeSlot[] = [];
+    const busyTimesForDay = busySlots.get(date) || [];
+
+    const workStart = this.timeToMinutes(workingHours.start);
+    const workEnd = this.timeToMinutes(workingHours.end);
+
+    for (let currentTime = workStart; currentTime + meetingDuration <= workEnd; currentTime += 60) {
+      const slotStart = this.minutesToTime(currentTime);
+      const slotEnd = this.minutesToTime(currentTime + meetingDuration);
+
+      if (!this.isSlotBusy(slotStart, slotEnd, busyTimesForDay)) {
+        slots.push({
+          date,
+          startTime: slotStart,
+          endTime: slotEnd,
+        });
+      }
+    }
+
+    return slots;
+  }
+
+  private isSlotBusy(
+    slotStart: string,
+    slotEnd: string,
+    busyTimes: Array<{ start: string; end: string }>,
+  ): boolean {
+    const slotStartMinutes = this.timeToMinutes(slotStart);
+    const slotEndMinutes = this.timeToMinutes(slotEnd);
+
+    for (const busy of busyTimes) {
+      const busyStartMinutes = this.timeToMinutes(busy.start);
+      const busyEndMinutes = this.timeToMinutes(busy.end);
+
+      if (slotStartMinutes < busyEndMinutes && slotEndMinutes > busyStartMinutes) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private timeToMinutes(time: string): number {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  }
+
+  private minutesToTime(minutes: number): string {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+  }
+
+  private formatTime(date: Date): string {
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
   }
 
   private getDefaultTimeSlots(request: SchedulingRequest): TimeSlot[] {
